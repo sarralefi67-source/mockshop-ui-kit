@@ -10,33 +10,285 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as CommandeConfirmeeRouteImport } from './routes/commande-confirmee'
+import { Route as CompteRouteImport } from './routes/compte'
+import { Route as ConnexionRouteImport } from './routes/connexion'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as FavorisRouteImport } from './routes/favoris'
+import { Route as InscriptionRouteImport } from './routes/inscription'
+import { Route as PromotionsRouteImport } from './routes/promotions'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
+import { Route as AdminCommandesRouteImport } from './routes/admin.commandes'
+import { Route as AdminProduitsRouteImport } from './routes/admin.produits'
+import { Route as AdminPromotionsRouteImport } from './routes/admin.promotions'
+import { Route as CategorieSlugRouteImport } from './routes/categorie.$slug'
+import { Route as CompteIndexRouteImport } from './routes/compte.index'
+import { Route as CompteAdressesRouteImport } from './routes/compte.adresses'
+import { Route as CompteCommandesRouteImport } from './routes/compte.commandes'
+import { Route as PagesSlugRouteImport } from './routes/pages.$slug'
+import { Route as ProduitSlugRouteImport } from './routes/produit.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommandeConfirmeeRoute = CommandeConfirmeeRouteImport.update({
+  id: '/commande-confirmee',
+  path: '/commande-confirmee',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompteRoute = CompteRouteImport.update({
+  id: '/compte',
+  path: '/compte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnexionRoute = ConnexionRouteImport.update({
+  id: '/connexion',
+  path: '/connexion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FavorisRoute = FavorisRouteImport.update({
+  id: '/favoris',
+  path: '/favoris',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InscriptionRoute = InscriptionRouteImport.update({
+  id: '/inscription',
+  path: '/inscription',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromotionsRoute = PromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommandesRoute = AdminCommandesRouteImport.update({
+  id: '/commandes',
+  path: '/commandes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProduitsRoute = AdminProduitsRouteImport.update({
+  id: '/produits',
+  path: '/produits',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const CategorieSlugRoute = CategorieSlugRouteImport.update({
+  id: '/categorie/$slug',
+  path: '/categorie/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompteIndexRoute = CompteIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CompteRoute,
+} as any)
+const CompteAdressesRoute = CompteAdressesRouteImport.update({
+  id: '/adresses',
+  path: '/adresses',
+  getParentRoute: () => CompteRoute,
+} as any)
+const CompteCommandesRoute = CompteCommandesRouteImport.update({
+  id: '/commandes',
+  path: '/commandes',
+  getParentRoute: () => CompteRoute,
+} as any)
+const PagesSlugRoute = PagesSlugRouteImport.update({
+  id: '/pages/$slug',
+  path: '/pages/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProduitSlugRoute = ProduitSlugRouteImport.update({
+  id: '/produit/$slug',
+  path: '/produit/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/checkout': typeof CheckoutRoute
+  '/commande-confirmee': typeof CommandeConfirmeeRoute
+  '/compte': typeof CompteRouteWithChildren
+  '/connexion': typeof ConnexionRoute
+  '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
+  '/inscription': typeof InscriptionRoute
+  '/promotions': typeof PromotionsRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/commandes': typeof AdminCommandesRoute
+  '/admin/produits': typeof AdminProduitsRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/categorie/$slug': typeof CategorieSlugRoute
+  '/compte/adresses': typeof CompteAdressesRoute
+  '/compte/commandes': typeof CompteCommandesRoute
+  '/pages/$slug': typeof PagesSlugRoute
+  '/produit/$slug': typeof ProduitSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/compte/': typeof CompteIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/checkout': typeof CheckoutRoute
+  '/commande-confirmee': typeof CommandeConfirmeeRoute
+  '/connexion': typeof ConnexionRoute
+  '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
+  '/inscription': typeof InscriptionRoute
+  '/promotions': typeof PromotionsRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/commandes': typeof AdminCommandesRoute
+  '/admin/produits': typeof AdminProduitsRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/categorie/$slug': typeof CategorieSlugRoute
+  '/compte/adresses': typeof CompteAdressesRoute
+  '/compte/commandes': typeof CompteCommandesRoute
+  '/pages/$slug': typeof PagesSlugRoute
+  '/produit/$slug': typeof ProduitSlugRoute
+  '/admin': typeof AdminIndexRoute
+  '/compte': typeof CompteIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/checkout': typeof CheckoutRoute
+  '/commande-confirmee': typeof CommandeConfirmeeRoute
+  '/compte': typeof CompteRouteWithChildren
+  '/connexion': typeof ConnexionRoute
+  '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
+  '/inscription': typeof InscriptionRoute
+  '/promotions': typeof PromotionsRoute
+  '/admin/categories': typeof AdminCategoriesRoute
+  '/admin/commandes': typeof AdminCommandesRoute
+  '/admin/produits': typeof AdminProduitsRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/categorie/$slug': typeof CategorieSlugRoute
+  '/compte/adresses': typeof CompteAdressesRoute
+  '/compte/commandes': typeof CompteCommandesRoute
+  '/pages/$slug': typeof PagesSlugRoute
+  '/produit/$slug': typeof ProduitSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/compte/': typeof CompteIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/checkout'
+    | '/commande-confirmee'
+    | '/compte'
+    | '/connexion'
+    | '/contact'
+    | '/favoris'
+    | '/inscription'
+    | '/promotions'
+    | '/admin/categories'
+    | '/admin/commandes'
+    | '/admin/produits'
+    | '/admin/promotions'
+    | '/categorie/$slug'
+    | '/compte/adresses'
+    | '/compte/commandes'
+    | '/pages/$slug'
+    | '/produit/$slug'
+    | '/admin/'
+    | '/compte/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/checkout'
+    | '/commande-confirmee'
+    | '/connexion'
+    | '/contact'
+    | '/favoris'
+    | '/inscription'
+    | '/promotions'
+    | '/admin/categories'
+    | '/admin/commandes'
+    | '/admin/produits'
+    | '/admin/promotions'
+    | '/categorie/$slug'
+    | '/compte/adresses'
+    | '/compte/commandes'
+    | '/pages/$slug'
+    | '/produit/$slug'
+    | '/admin'
+    | '/compte'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/checkout'
+    | '/commande-confirmee'
+    | '/compte'
+    | '/connexion'
+    | '/contact'
+    | '/favoris'
+    | '/inscription'
+    | '/promotions'
+    | '/admin/categories'
+    | '/admin/commandes'
+    | '/admin/produits'
+    | '/admin/promotions'
+    | '/categorie/$slug'
+    | '/compte/adresses'
+    | '/compte/commandes'
+    | '/pages/$slug'
+    | '/produit/$slug'
+    | '/admin/'
+    | '/compte/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  CheckoutRoute: typeof CheckoutRoute
+  CommandeConfirmeeRoute: typeof CommandeConfirmeeRoute
+  CompteRoute: typeof CompteRouteWithChildren
+  ConnexionRoute: typeof ConnexionRoute
+  ContactRoute: typeof ContactRoute
+  FavorisRoute: typeof FavorisRoute
+  InscriptionRoute: typeof InscriptionRoute
+  PromotionsRoute: typeof PromotionsRoute
+  CategorieSlugRoute: typeof CategorieSlugRoute
+  PagesSlugRoute: typeof PagesSlugRoute
+  ProduitSlugRoute: typeof ProduitSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +300,196 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/commande-confirmee': {
+      id: '/commande-confirmee'
+      path: '/commande-confirmee'
+      fullPath: '/commande-confirmee'
+      preLoaderRoute: typeof CommandeConfirmeeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compte': {
+      id: '/compte'
+      path: '/compte'
+      fullPath: '/compte'
+      preLoaderRoute: typeof CompteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connexion': {
+      id: '/connexion'
+      path: '/connexion'
+      fullPath: '/connexion'
+      preLoaderRoute: typeof ConnexionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/favoris': {
+      id: '/favoris'
+      path: '/favoris'
+      fullPath: '/favoris'
+      preLoaderRoute: typeof FavorisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inscription': {
+      id: '/inscription'
+      path: '/inscription'
+      fullPath: '/inscription'
+      preLoaderRoute: typeof InscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/promotions': {
+      id: '/promotions'
+      path: '/promotions'
+      fullPath: '/promotions'
+      preLoaderRoute: typeof PromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/categories': {
+      id: '/admin/categories'
+      path: '/categories'
+      fullPath: '/admin/categories'
+      preLoaderRoute: typeof AdminCategoriesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/commandes': {
+      id: '/admin/commandes'
+      path: '/commandes'
+      fullPath: '/admin/commandes'
+      preLoaderRoute: typeof AdminCommandesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/produits': {
+      id: '/admin/produits'
+      path: '/produits'
+      fullPath: '/admin/produits'
+      preLoaderRoute: typeof AdminProduitsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/promotions': {
+      id: '/admin/promotions'
+      path: '/promotions'
+      fullPath: '/admin/promotions'
+      preLoaderRoute: typeof AdminPromotionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/categorie/$slug': {
+      id: '/categorie/$slug'
+      path: '/categorie/$slug'
+      fullPath: '/categorie/$slug'
+      preLoaderRoute: typeof CategorieSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compte/': {
+      id: '/compte/'
+      path: '/'
+      fullPath: '/compte/'
+      preLoaderRoute: typeof CompteIndexRouteImport
+      parentRoute: typeof CompteRoute
+    }
+    '/compte/adresses': {
+      id: '/compte/adresses'
+      path: '/adresses'
+      fullPath: '/compte/adresses'
+      preLoaderRoute: typeof CompteAdressesRouteImport
+      parentRoute: typeof CompteRoute
+    }
+    '/compte/commandes': {
+      id: '/compte/commandes'
+      path: '/commandes'
+      fullPath: '/compte/commandes'
+      preLoaderRoute: typeof CompteCommandesRouteImport
+      parentRoute: typeof CompteRoute
+    }
+    '/pages/$slug': {
+      id: '/pages/$slug'
+      path: '/pages/$slug'
+      fullPath: '/pages/$slug'
+      preLoaderRoute: typeof PagesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/produit/$slug': {
+      id: '/produit/$slug'
+      path: '/produit/$slug'
+      fullPath: '/produit/$slug'
+      preLoaderRoute: typeof ProduitSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminCategoriesRoute: typeof AdminCategoriesRoute
+  AdminCommandesRoute: typeof AdminCommandesRoute
+  AdminProduitsRoute: typeof AdminProduitsRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCategoriesRoute: AdminCategoriesRoute,
+  AdminCommandesRoute: AdminCommandesRoute,
+  AdminProduitsRoute: AdminProduitsRoute,
+  AdminPromotionsRoute: AdminPromotionsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface CompteRouteChildren {
+  CompteAdressesRoute: typeof CompteAdressesRoute
+  CompteCommandesRoute: typeof CompteCommandesRoute
+  CompteIndexRoute: typeof CompteIndexRoute
+}
+
+const CompteRouteChildren: CompteRouteChildren = {
+  CompteAdressesRoute: CompteAdressesRoute,
+  CompteCommandesRoute: CompteCommandesRoute,
+  CompteIndexRoute: CompteIndexRoute,
+}
+
+const CompteRouteWithChildren =
+  CompteRoute._addFileChildren(CompteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  CheckoutRoute: CheckoutRoute,
+  CommandeConfirmeeRoute: CommandeConfirmeeRoute,
+  CompteRoute: CompteRouteWithChildren,
+  ConnexionRoute: ConnexionRoute,
+  ContactRoute: ContactRoute,
+  FavorisRoute: FavorisRoute,
+  InscriptionRoute: InscriptionRoute,
+  PromotionsRoute: PromotionsRoute,
+  CategorieSlugRoute: CategorieSlugRoute,
+  PagesSlugRoute: PagesSlugRoute,
+  ProduitSlugRoute: ProduitSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
