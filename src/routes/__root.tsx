@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "@/context/StoreContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -115,6 +116,29 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try{
+              var host = location.hostname;
+              if(host === 'localhost' || host === '127.0.0.1'){
+                try{ document.documentElement.removeAttribute('bbai-tooltip-injected'); }catch(e){}
+                try{ var els = document.querySelectorAll('[bbai-tooltip-injected]'); els.forEach(function(el){ el.removeAttribute('bbai-tooltip-injected'); }); }catch(e){}
+                try{
+                  var _fetch = window.fetch;
+                  window.fetch = function(input, init){
+                    try{
+                      var url = typeof input === 'string' ? input : (input && input.url);
+                      if(url && url.indexOf('useblackbox.io') !== -1){
+                        return Promise.resolve(new Response(null, { status: 204, statusText: 'No Content' }));
+                      }
+                    }catch(e){}
+                    return _fetch.apply(this, arguments);
+                  };
+                }catch(e){}
+              }
+            }catch(e){}
+          })();
+        ` }} />
         {children}
         <Scripts />
       </body>
@@ -127,11 +151,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
+      <AuthProvider>
+        <StoreProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster position="top-center" richColors />
-      </StoreProvider>
+        </StoreProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

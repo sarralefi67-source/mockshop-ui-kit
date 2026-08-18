@@ -1,7 +1,9 @@
-import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Heart, LogOut, MapPin, Package, User } from "lucide-react";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { currentCustomer } from "@/data/orders";
+import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/compte")({
@@ -25,6 +27,11 @@ const links = [
 
 function AccountLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, profile, loading } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!loading && !user) navigate({ to: "/connexion" });
+  }, [loading, user, navigate]);
 
   return (
     <StoreLayout>
@@ -33,9 +40,9 @@ function AccountLayout() {
           <div className="rounded-xl border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground">Bonjour</p>
             <p className="text-lg font-bold">
-              {currentCustomer.first_name} {currentCustomer.last_name}
+              {profile?.first_name ?? currentCustomer.first_name} {profile?.last_name ?? currentCustomer.last_name}
             </p>
-            <p className="text-xs text-muted-foreground">{currentCustomer.email}</p>
+            <p className="text-xs text-muted-foreground">{profile?.email ?? currentCustomer.email}</p>
           </div>
           <nav className="mt-4 space-y-1">
             {links.map(({ to, label, icon: Icon, exact }) => {

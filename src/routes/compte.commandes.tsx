@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Package } from "lucide-react";
-import { ORDER_STATUS_LABELS, orders } from "@/data/orders";
-import { formatPrice } from "@/lib/placeholder";
+import { ORDER_STATUS_LABELS } from "@/data/orders";
+import { formatPrice, mockImage } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { OrderStatus } from "@/types";
+import type { OrderStatus, Order } from "@/types";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/compte/commandes")({
   component: AccountOrders,
@@ -20,8 +22,73 @@ const statusStyle: Record<OrderStatus, string> = {
 };
 
 function AccountOrders() {
-  const myOrders = orders.filter((o) => o.customer_name === "Sarra Lefi");
-  const [openId, setOpenId] = useState<string | null>(myOrders[0]?.id ?? null);
+  const { profile, loading: authLoading } = useAuth();
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      if (!profile) {
+        if (mounted) {
+          setMyOrders([]);
+          setLoadingOrders(false);
+        }
+        return;
+      }
+      setLoadingOrders(true);
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `id, order_number, status, payment_method, subtotal, discount_amount, shipping_amount, total, shipping_address, created_at, order_items(*)`
+        )
+        .eq("user_id", profile.id)
+        .order("created_at", { ascending: false });
+
+      if (!mounted) return;
+      if (error) {
+        console.error("fetch orders error:", error);
+        setMyOrders([]);
+        setLoadingOrders(false);
+        return;
+      }
+
+      const mapped: Order[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        reference: r.order_number,
+        customer_name: (profile.first_name || "") + (profile.last_name ? ` ${profile.last_name}` : ""),
+        customer_phone: r.shipping_address?.phone ?? "",
+        status: r.status as OrderStatus,
+        payment_method: (r.payment_method as any) ?? "cod",
+        subtotal: Number(r.subtotal ?? 0),
+        shipping: Number(r.shipping_amount ?? 0),
+        discount: Number(r.discount_amount ?? 0),
+        total: Number(r.total ?? 0),
+        governorate: r.shipping_address?.governorate ?? "",
+        created_at: r.created_at,
+        items: (r.order_items ?? []).map((it: any) => ({
+          id: it.id,
+          product_id: it.product_id,
+          variant_id: it.variant_id,
+          name: it.product_name,
+          variant_label: it.variant_label ?? null,
+          image: mockImage(it.product_name ?? "Produit"),
+          unit_price: Number(it.unit_price ?? 0),
+          quantity: Number(it.quantity ?? 1),
+        })),
+      }));
+
+      setMyOrders(mapped);
+      setOpenId(mapped[0]?.id ?? null);
+      setLoadingOrders(false);
+    }
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [profile?.id]);
 
   return (
     <div className="space-y-6">
@@ -30,7 +97,12 @@ function AccountOrders() {
         <p className="text-sm text-muted-foreground">Historique et suivi de vos achats.</p>
       </div>
 
-      {myOrders.length === 0 ? (
+      {loadingOrders || authLoading ? (
+        <div className="rounded-xl border border-dashed border-border py-12 text-center">
+          <Package className="mx-auto h-10 w-10 text-muted-foreground animate-pulse" />
+          <p className="mt-3 font-semibold">Chargement de vos commandes…</p>
+        </div>
+      ) : myOrders.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-20 text-center">
           <Package className="mx-auto h-10 w-10 text-muted-foreground" />
           <p className="mt-3 font-semibold">Aucune commande pour le moment</p>

@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CartItem } from "@/types";
 import { SHIPPING_FEE, coupons } from "@/data/coupons";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AppliedCoupon {
   code: string;
@@ -30,6 +32,7 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
+  const { profile } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlist, setWishlist] = useState<string[]>(["p-3", "p-9"]);
@@ -68,11 +71,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCoupon(null);
   }, []);
 
-  const toggleWishlist = useCallback((productId: string) => {
-    setWishlist((prev) =>
-      prev.includes(productId) ? prev.filter((p) => p !== productId) : [...prev, productId],
-    );
-  }, []);
+  const toggleWishlist = useCallback(async (productId: string) => {
+    // optimistic UI update
+    setWishlist((prev) => (prev.includes(productId) ? prev.filter((p) => p !== productId) : [...prev, productId]));
+
+    if (!profile) return; // keep local only for guests
+
+    try {
+      const exists = wishlist.includes(productId);
+      if (exists) {
+        // delete row
+        const { error } = await supabase.from("wishlists").delete().match({ user_id: profile.id, product_id: productId });
+        if (error) {
+          console.error("Failed to remove wishlist item:", error);
+        }
+      } else {
+        const { error } = await supabase.from("wishlists").insert({ user_id: profile.id, product_id: productId });
+        if (error) {
+          console.error("Failed to add wishlist item:", error);
+        }
+      }
+    } catch (err) {
+      console.error("toggleWishlist error:", err);
+    }
+  }, [profile, wishlist]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0),
@@ -100,6 +122,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [items],
   );
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadWishlist() {
+      if (!profile) {
+        // keep default demo wishlist for guests
+        setWishlist((prev) => prev);
+        return;
+      }
+      const { data, error } = await supabase.from("wishlists").select("product_id").eq("user_id", profile.id);
+      if (error) {
+        console.error("Could not load wishlist:", error);
+        return;
+      }
+      if (!mounted) return;
+      setWishlist((data ?? []).map((r: any) => r.product_id));
+    }
+    loadWishlist();
+    return () => { mounted = false; };
+  }, [profile]);
 
   const value: StoreContextValue = {
     items, addItem, removeItem, updateQuantity, clearCart,

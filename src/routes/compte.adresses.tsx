@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { addresses as seedAddresses } from "@/data/orders";
@@ -14,6 +14,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/compte/adresses")({
   component: AccountAddresses,
@@ -26,22 +28,89 @@ const emptyAddress: Address = {
 
 function AccountAddresses() {
   const [list, setList] = useState<Address[]>(seedAddresses);
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Address>(emptyAddress);
 
-  const save = () => {
+  const save = async () => {
     if (!draft.label || !draft.line1) {
       toast.error("Libellé et adresse sont obligatoires.");
       return;
     }
-    setList((prev) =>
-      draft.id
-        ? prev.map((a) => (a.id === draft.id ? draft : a))
-        : [...prev, { ...draft, id: `a-${Date.now()}` }],
-    );
-    setOpen(false);
-    toast.success("Adresse enregistrée (démo).");
+    if (!profile) {
+      // local fallback for guests
+      setList((prev) =>
+        draft.id
+          ? prev.map((a) => (a.id === draft.id ? draft : a))
+          : [...prev, { ...draft, id: `a-${Date.now()}` }],
+      );
+      setOpen(false);
+      toast.success("Adresse enregistrée (démo). Si vous voulez sauvegarder votre compte, connectez-vous.");
+      return;
+    }
+
+    try {
+      if (draft.id) {
+        const { error } = await supabase.from("addresses").update({
+          label: draft.label,
+          full_name: draft.full_name,
+          line1: draft.line1,
+          city: draft.city,
+          governorate: draft.governorate,
+          phone: draft.phone,
+          postal_code: draft.postal_code,
+          is_default: draft.is_default,
+        }).eq("id", draft.id).eq("user_id", profile.id);
+        if (error) throw error;
+        setList((prev) => prev.map((a) => (a.id === draft.id ? draft : a)));
+        toast.success("Adresse mise à jour.");
+      } else {
+        const payload = {
+          user_id: profile.id,
+          label: draft.label,
+          full_name: draft.full_name,
+          line1: draft.line1,
+          city: draft.city,
+          governorate: draft.governorate,
+          phone: draft.phone,
+          postal_code: draft.postal_code,
+          is_default: draft.is_default,
+        };
+        const { data, error } = await supabase.from("addresses").insert(payload).select().maybeSingle();
+        if (error) throw error;
+        setList((prev) => [...prev, { ...(data as any) }]);
+        toast.success("Adresse ajoutée.");
+      }
+      setOpen(false);
+    } catch (err: any) {
+      console.error("save address error:", err);
+      toast.error("Erreur lors de l'enregistrement.");
+    }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      if (!profile) {
+        setList(seedAddresses);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.from("addresses").select("*").eq("user_id", profile.id).order("is_default", { ascending: false });
+      if (error) {
+        console.error("load addresses error:", error);
+        setList([]);
+        setLoading(false);
+        return;
+      }
+      if (!mounted) return;
+      setList(data ?? []);
+      setLoading(false);
+    }
+    load();
+    return () => { mounted = false; };
+  }, [profile]);
 
   return (
     <div className="space-y-6">
@@ -132,7 +201,22 @@ function AccountAddresses() {
                   <button
                     aria-label="Supprimer"
                     className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-surface hover:text-destructive"
-                    onClick={() => { setList((p) => p.filter((x) => x.id !== a.id)); toast.success("Adresse supprimée."); }}
+                    onClick={async () => {
+                      if (!profile) {
+                        setList((p) => p.filter((x) => x.id !== a.id));
+                        toast.success("Adresse supprimée (démo).");
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.from("addresses").delete().eq("id", a.id).eq("user_id", profile.id);
+                        if (error) throw error;
+                        setList((p) => p.filter((x) => x.id !== a.id));
+                        toast.success("Adresse supprimée.");
+                      } catch (err) {
+                        console.error("delete address error:", err);
+                        toast.error("Impossible de supprimer l'adresse.");
+                      }
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, Menu, Phone, Search, ShoppingCart, User, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/context/StoreContext";
+import { useAuth } from "@/context/AuthContext";
 import { buildCategoryTree } from "@/data/categories";
 import { searchProducts } from "@/data/products";
 import { formatPrice } from "@/lib/placeholder";
@@ -15,6 +16,7 @@ const tree = buildCategoryTree();
 
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
+  const { user, profile, signOut } = useAuth();
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -41,14 +43,14 @@ export function Header() {
             <Menu className="h-6 w-6" />
           </button>
 
-          <Link to="/" className="flex items-center gap-2">
+          {/* <Link to="/" className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-md bg-accent-strong text-lg font-black text-accent-strong-foreground">
               N
             </span>
             <span className="text-lg font-extrabold tracking-tight">
               Nexa<span className="text-accent-strong">Store</span>
             </span>
-          </Link>
+          </Link> */}
 
           <div className="relative ml-auto hidden max-w-xl flex-1 md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -94,11 +96,20 @@ export function Header() {
           </div>
 
           <div className="ml-auto flex items-center gap-1 md:ml-0">
-            <Button variant="ghost" size="icon" asChild aria-label="Mon compte">
-              <Link to="/compte">
-                <User className="h-5 w-5" />
-              </Link>
-            </Button>
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:block text-sm font-medium">{profile?.first_name ?? user.email}</span>
+                <Button variant="ghost" size="icon" onClick={async () => { await signOut(); }} aria-label="Se déconnecter">
+                  <User className="h-5 w-5" />
+                </Button>
+              </div>
+            ) : (
+              <Button variant="ghost" size="icon" asChild aria-label="Mon compte">
+                <Link to="/connexion">
+                  <User className="h-5 w-5" />
+                </Link>
+              </Button>
+            )}
             <Button variant="ghost" size="icon" asChild aria-label="Mes favoris" className="relative">
               <Link to="/favoris">
                 <Heart className="h-5 w-5" />

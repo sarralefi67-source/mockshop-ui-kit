@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImagePlus, Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { products as seedProducts } from "@/data/products";
-import { categories } from "@/data/categories";
-import type { Product, ProductAttribute, ProductVariant } from "@/types";
-import { formatPrice, mockImage } from "@/lib/placeholder";
+import { supabase } from "@/lib/supabaseClient";
+import { uploadToBucket } from "@/lib/storage";
+import type { Product, ProductAttribute, ProductVariant, ProductImage } from "@/types";
+import { formatPrice } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +35,10 @@ const emptyProduct: Product = {
 };
 
 function AdminProducts() {
-  const [list, setList] = useState<Product[]>(seedProducts);
+  const [list, setList] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [categoriesMap, setCategoriesMap] = useState<Record<string, string>>({});
+  useEffect(() => { fetchProducts(); }, []);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Product>(emptyProduct);
@@ -46,19 +49,105 @@ function AdminProducts() {
       p.brand.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const save = () => {
+  const fetchProducts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, product_images(*), product_variants(*)")
+      .order("created_at", { ascending: false });
+    setLoading(false);
+    if (error) {
+      console.error(error);
+      toast.error("Erreur lors du chargement des produits.");
+      return;
+    }
+    // fetch categories names map
+    try {
+      const { data: cats } = await supabase.from("categories").select("id,name");
+      setCategoriesMap((cats ?? []).reduce((acc: any, c: any) => ({ ...acc, [c.id]: c.name }), {}));
+    } catch (e) {
+      console.warn("could not load categories map", e);
+    }
+    const mapped = (data ?? []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      slug: d.slug,
+      brand: d.brand ?? "",
+      category_id: d.category_id,
+      short_description: d.short_description ?? "",
+      description: d.description ?? "",
+      price: Number(d.base_price ?? 0),
+      compare_at_price: d.compare_at_price ? Number(d.compare_at_price) : null,
+      stock: d.stock_quantity ?? 0,
+      sku: d.sku ?? "",
+      is_active: d.is_active ?? true,
+      is_new: false,
+      rating: 0,
+      reviews_count: 0,
+      created_at: d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      images: (d.product_images ?? []).map((img: any) : ProductImage => ({ id: img.id, product_id: d.id, url: img.url, alt: "", position: img.position ?? 0, variant_value: null })),
+      attributes: [],
+      variants: (d.product_variants ?? []).map((v: any) : ProductVariant => ({ id: v.id, product_id: d.id, sku: v.sku ?? "", options: {}, price: Number(v.price), compare_at_price: v.compare_at_price ? Number(v.compare_at_price) : null, stock: v.stock_quantity ?? 0, is_active: v.is_active ?? true })),
+      tags: [],
+    }));
+    setList(mapped);
+  };
+
+  const save = async () => {
     if (!draft.name.trim()) {
       toast.error("Le nom du produit est obligatoire.");
       return;
     }
     const slug = draft.slug.trim() || draft.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    setList((prev) =>
-      draft.id
-        ? prev.map((p) => (p.id === draft.id ? { ...draft, slug } : p))
-        : [...prev, { ...draft, slug, id: `p-${Date.now()}`, sku: `P-${Date.now()}` }],
-    );
-    setOpen(false);
-    toast.success(draft.id ? "Produit mis à jour." : "Produit créé.");
+
+    try {
+      if (!draft.id) {
+        const insert = {
+          name: draft.name,
+          slug,
+          brand: draft.brand || null,
+          category_id: draft.category_id || null,
+          short_description: draft.short_description || null,
+          description: draft.description || null,
+          base_price: draft.price || 0,
+          sku: draft.sku || `SKU-${Date.now()}`,
+          has_variants: draft.variants.length > 0,
+          stock_quantity: draft.stock,
+          is_active: draft.is_active,
+        };
+        const { data, error } = await supabase.from("products").insert(insert).select().single();
+        if (error) throw error;
+        setDraft({ ...draft, id: data.id });
+        toast.success("Produit créé.");
+      } else {
+        const upd = {
+          name: draft.name,
+          slug,
+          brand: draft.brand || null,
+          category_id: draft.category_id || null,
+          short_description: draft.short_description || null,
+          description: draft.description || null,
+          base_price: draft.price || 0,
+          sku: draft.sku || null,
+          has_variants: draft.variants.length > 0,
+          stock_quantity: draft.stock,
+          is_active: draft.is_active,
+        };
+        const { error } = await supabase.from("products").update(upd).eq("id", draft.id);
+        if (error) throw error;
+        toast.success("Produit mis à jour.");
+      }
+      await fetchProducts();
+      setOpen(false);
+    } catch (err) {
+      console.error(err);
+      const msg = (err as any)?.message ?? String(err);
+      if (msg.includes("violates row-level security") || msg.includes("row-level security")) {
+        toast.error("Insertion refusée par les policies RLS — vérifiez les policies DB ou connectez-vous en tant qu'admin.");
+      } else {
+        toast.error("Erreur lors de l'enregistrement.");
+      }
+    }
   };
 
   /* ---- gestion des attributs / variantes dans le formulaire ---- */
@@ -76,7 +165,7 @@ function AdminProducts() {
   const updateAttribute = (id: string, patch: Partial<ProductAttribute>) =>
     setDraft({
       ...draft,
-      attributes: draft.attributes.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+      attributes: draft.attributes.map((a: ProductAttribute) => (a.id === id ? { ...a, ...patch } : a)),
     });
 
   const addValue = (attrId: string) =>
@@ -104,7 +193,7 @@ function AdminProducts() {
   const updateVariant = (id: string, patch: Partial<ProductVariant>) =>
     setDraft({
       ...draft,
-      variants: draft.variants.map((v) => (v.id === id ? { ...v, ...patch } : v)),
+      variants: draft.variants.map((v: ProductVariant) => (v.id === id ? { ...v, ...patch } : v)),
     });
 
   return (
@@ -154,7 +243,7 @@ function AdminProducts() {
                     <p className="text-xs text-muted-foreground">{p.brand}</p>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {categories.find((c) => c.id === p.category_id)?.name ?? "—"}
+                    {categoriesMap[p.category_id ?? ""] ?? "—"}
                   </TableCell>
                   <TableCell className="font-semibold">{formatPrice(p.price)}</TableCell>
                   <TableCell className={p.stock === 0 ? "font-semibold text-destructive" : ""}>{p.stock}</TableCell>
@@ -204,12 +293,14 @@ function AdminProducts() {
                 <Label>Marque</Label>
                 <Input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
               </div>
-              <div className="space-y-2">
+                <div className="space-y-2">
                 <Label>Catégorie</Label>
-                <Select value={draft.category_id} onValueChange={(v) => setDraft({ ...draft, category_id: v })}>
+                <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent className="max-h-72">
-                    {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {Object.entries(categoriesMap).map(([id, name]) => (
+                      <SelectItem key={id} value={id}>{name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -259,7 +350,20 @@ function AdminProducts() {
                     <button
                       aria-label="Supprimer l'image"
                       className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-card shadow-card"
-                      onClick={() => setDraft({ ...draft, images: draft.images.filter((i) => i.id !== img.id) })}
+                      onClick={async () => {
+                        if (!draft.id) {
+                          setDraft({ ...draft, images: draft.images.filter((i) => i.id !== img.id) });
+                          return;
+                        }
+                        try {
+                          await supabase.from("product_images").delete().eq("id", img.id);
+                          setDraft({ ...draft, images: draft.images.filter((i) => i.id !== img.id) });
+                          toast.success("Image supprimée.");
+                        } catch (e) {
+                          console.error(e);
+                          toast.error("Impossible de supprimer l'image.");
+                        }
+                      }}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -270,24 +374,57 @@ function AdminProducts() {
                     )}
                   </div>
                 ))}
-                <button
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      images: [
-                        ...draft.images,
-                        {
-                          id: `img-${Date.now()}`, product_id: draft.id || "new",
-                          url: mockImage(draft.brand || "Image", "#d7dbe0", "Nouvelle"),
-                          alt: draft.name, position: draft.images.length, variant_value: null,
-                        },
-                      ],
-                    })
-                  }
-                  className="grid h-24 w-24 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground hover:border-accent-strong hover:text-accent-strong"
-                >
+
+                <label className="grid h-24 w-24 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground hover:border-accent-strong hover:text-accent-strong cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          // Ensure product exists first and capture its id immediately
+                          let productId = draft.id;
+                          if (!productId) {
+                            const { data, error } = await supabase.from("products").insert({
+                              name: draft.name || "Untitled",
+                              slug: draft.slug || `prod-${Date.now()}`,
+                              base_price: draft.price || 0,
+                            }).select().single();
+                            if (error) throw error;
+                            productId = data.id;
+                            setDraft((d) => ({ ...d, id: productId }));
+                          }
+
+                          // sanitize filename: keep letters, numbers, dash, underscore and dot
+                          const rawName = file.name.replace(/\s+/g, "_");
+                          const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, "");
+
+                          // Use productId as first path segment (don't repeat the bucket name)
+                          const path = `${productId}/${Date.now()}-${safeName}`;
+                          const publicUrl = await uploadToBucket("products", path, file);
+
+                          const { error } = await supabase.from("product_images").insert({ product_id: productId, url: publicUrl }).select();
+                          if (error) throw error;
+
+                          // refresh images
+                          const { data: refreshed } = await supabase.from("product_images").select("*").eq("product_id", productId).order("position");
+                          setDraft((d) => ({ ...d, images: (refreshed ?? []).map((img: any) => ({ id: img.id, product_id: img.product_id, url: img.url, alt: "", position: img.position ?? 0, variant_value: null })) }));
+                          toast.success("Image uploadée.");
+                        } catch (err) {
+                          console.error(err);
+                          const msg = (err as any)?.message ?? String(err);
+                          if (msg.includes("violates row-level security") || msg.includes("row-level security")) {
+                            toast.error("Upload refusé par les policies RLS — vérifiez que l'utilisateur est admin ou ajustez les policies DB.");
+                          } else {
+                            toast.error("Échec de l'upload.");
+                          }
+                        }
+                      }}
+                  />
                   <ImagePlus className="h-6 w-6" />
-                </button>
+                </label>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">
                 Rattachez une image à une valeur d'attribut (couleur) pour que la galerie change avec la variante.

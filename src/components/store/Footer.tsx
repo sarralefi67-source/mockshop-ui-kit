@@ -1,13 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import { Mail, MapPin, Phone, Truck, ShieldCheck, RotateCcw } from "lucide-react";
 import { buildCategoryTree } from "@/data/categories";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 
 const tree = buildCategoryTree();
 
 export function Footer() {
+  const [email, setEmail] = useState("");
+
   return (
     <footer className="mt-16 border-t border-border bg-card">
       <div className="container-page grid gap-6 border-b border-border py-8 sm:grid-cols-3">
@@ -80,12 +84,30 @@ export function Footer() {
           </p>
           <form
             className="mt-4 flex gap-2"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              toast.success("Inscription enregistrée (démo).");
+              if (!email) return;
+              try {
+                const { error } = await supabase.from("newsletter_subscribers").insert({ email }).select();
+                if (error) {
+                  // handle duplicate gracefully
+                  if ((error as any).code === "23505") {
+                    toast.success("Vous êtes déjà inscrit(e) à la newsletter.");
+                  } else {
+                    console.error("newsletter insert error:", error);
+                    toast.error("Impossible de vous inscrire pour le moment.");
+                  }
+                } else {
+                  toast.success("Inscription à la newsletter enregistrée.");
+                  setEmail("");
+                }
+              } catch (err) {
+                console.error(err);
+                toast.error("Erreur réseau.");
+              }
             }}
           >
-            <Input type="email" required placeholder="Votre e-mail" aria-label="E-mail" />
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required placeholder="Votre e-mail" aria-label="E-mail" />
             <Button variant="accent" type="submit">OK</Button>
           </form>
         </div>

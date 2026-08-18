@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
+// import HCaptcha from "@hcaptcha/react-hcaptcha"; // TODO: réactiver après achat du nom de domaine
+import { useAuth } from "@/context/AuthContext";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +23,9 @@ export const Route = createFileRoute("/inscription")({
 
 function RegisterPage() {
   const [loading, setLoading] = useState(false);
+  const captchaRef = useRef<any>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -33,37 +38,69 @@ function RegisterPage() {
 
         <form
           className="mt-8 space-y-4 rounded-xl border border-border bg-card p-6"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            const form = e.currentTarget as HTMLFormElement;
+            const fd = new FormData(form);
+            const email = String(fd.get("em") ?? "").trim();
+            const password = String(fd.get("pw") ?? "");
+            const first_name = String(fd.get("fn") ?? "").trim() || null;
+            const last_name = String(fd.get("ln") ?? "").trim() || null;
+
+            // TODO: réactiver la vérification hCaptcha après achat du nom de domaine
+            // if (!token) {
+            //   toast.error("Veuillez compléter le hCaptcha");
+            //   return;
+            // }
+
             setLoading(true);
-            setTimeout(() => {
-              setLoading(false);
-              toast.success("Compte créé (démo) — authentification à brancher.");
+            // le token hCaptcha est maintenant transmis en 4e argument à signUp
+            const { error } = await signUp(email, password, { first_name, last_name }, token ?? undefined);
+            setLoading(false);
+            if (error) {
+              toast.error(error.message || "Erreur lors de la création du compte");
+              // le token hCaptcha est à usage unique : on le réinitialise et on force
+              // l'utilisateur à revalider le widget avant de réessayer
+              // captchaRef.current?.resetCaptcha?.();
+              setToken(null);
+            } else {
+              toast.success("Compte créé — vérifiez votre e-mail si confirmation requise.");
               navigate({ to: "/compte" });
-            }, 700);
+            }
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="fn">Prénom</Label>
-              <Input id="fn" required />
+              <Input id="fn" name="fn" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="ln">Nom</Label>
-              <Input id="ln" required />
+              <Input id="ln" name="ln" required />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="em">E-mail</Label>
-            <Input id="em" type="email" required />
+            <Input id="em" name="em" type="email" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ph">Téléphone</Label>
-            <Input id="ph" type="tel" required placeholder="+216 22 000 000" />
+            <Input id="ph" name="ph" type="tel" required placeholder="+216 22 000 000" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pw">Mot de passe</Label>
-            <Input id="pw" type="password" required />
+            <Input id="pw" name="pw" type="password" required />
+
+          {/* TODO: réactiver le widget hCaptcha après achat du nom de domaine
+          <div>
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={import.meta.env.VITE_HCAPTCHA_SITE_KEY ?? "VITE_HCAPTCHA_SITE_KEY"}
+              onVerify={(t) => setToken(t)}
+              onExpire={() => setToken(null)}
+            />
+          </div>
+          */}
           </div>
           <div className="flex items-start gap-2">
             <Checkbox id="nl" defaultChecked />

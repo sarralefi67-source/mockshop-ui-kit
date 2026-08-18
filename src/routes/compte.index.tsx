@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { currentCustomer } from "@/data/orders";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +14,13 @@ export const Route = createFileRoute("/compte/")({
 });
 
 function AccountInfo() {
+  const { profile } = useAuth();
   const [newsletter, setNewsletter] = useState(currentCustomer.newsletter);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (profile) setNewsletter(Boolean(profile.newsletter_opt_in));
+  }, [profile]);
 
   return (
     <div className="space-y-6">
@@ -24,10 +31,27 @@ function AccountInfo() {
 
       <form
         className="rounded-xl border border-border bg-card p-6"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           setSaving(true);
-          setTimeout(() => { setSaving(false); toast.success("Informations enregistrées (démo)."); }, 600);
+          try {
+            if (profile) {
+              const { error } = await supabase.from("profiles").update({ newsletter_opt_in: newsletter }).eq("id", profile.id);
+              if (error) throw error;
+              if (newsletter) {
+                // ensure newsletter_subscribers contains email
+                await supabase.from("newsletter_subscribers").insert({ email: profile.email }).select();
+              }
+              toast.success("Informations enregistrées.");
+            } else {
+              toast.success("Informations enregistrées (démo). Connectez-vous pour persister.");
+            }
+          } catch (err) {
+            console.error("save profile error:", err);
+            toast.error("Impossible d'enregistrer les informations.");
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">

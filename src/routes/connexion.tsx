@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/connexion")({
 function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   return (
     <StoreLayout>
@@ -33,23 +35,30 @@ function LoginPage() {
 
         <form
           className="mt-8 space-y-4 rounded-xl border border-border bg-card p-6"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            const form = e.currentTarget as HTMLFormElement;
+            const formData = new FormData(form);
+            const email = String(formData.get("email") ?? "").trim();
+            const password = String(formData.get("pwd") ?? "");
             setLoading(true);
-            setTimeout(() => {
-              setLoading(false);
-              toast.success("Connexion simulée — authentification à brancher.");
+            const { error } = await signIn(email, password);
+            setLoading(false);
+            if (error) {
+              toast.error(error.message || "Erreur de connexion");
+            } else {
+              toast.success("Connecté");
               navigate({ to: "/compte" });
-            }, 700);
+            }
           }}
         >
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" required placeholder="vous@example.tn" />
+            <Input id="email" name="email" type="email" required placeholder="vous@example.tn" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pwd">Mot de passe</Label>
-            <Input id="pwd" type="password" required placeholder="••••••••" />
+            <Input id="pwd" name="pwd" type="password" required placeholder="••••••••" />
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
