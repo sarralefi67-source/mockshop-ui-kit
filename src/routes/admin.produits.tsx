@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ImagePlus, Package, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, Package, Pencil, Plus, Trash2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { uploadToBucket } from "@/lib/storage";
+import { uploadToBucket, deleteFromBucket } from "@/lib/storage";
 import type { Product, ProductAttribute, ProductVariant, ProductImage } from "@/types";
 import { formatPrice } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/admin/produits")({
 });
 
 const emptyProduct: Product = {
-  id: "", name: "", slug: "", brand: "", category_id: "c-info-pc-portable",
+  id: "", name: "", slug: "", brand: "", category_id: "",
   short_description: "", description: "", price: 0, compare_at_price: null, stock: 0,
   sku: "", is_active: true, is_new: false, rating: 0, reviews_count: 0,
   created_at: new Date().toISOString().slice(0, 10),
@@ -38,16 +39,43 @@ function AdminProducts() {
   const [list, setList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [categoriesMap, setCategoriesMap] = useState<Record<string, string>>({});
+  const [categoriesList, setCategoriesList] = useState<{ id: string; parent_id: string | null; name: string }[]>([]);
+  const [stockFilter, setStockFilter] = useState<"all" | "in" | "low" | "out">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string | "all">("all");
+  const [priceSort, setPriceSort] = useState<"asc" | "desc" | null>(null);
+  const [viewProduct, setViewProduct] = useState<Product | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   useEffect(() => { fetchProducts(); }, []);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Product>(emptyProduct);
 
-  const filtered = list.filter(
-    (p) =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.brand.toLowerCase().includes(search.toLowerCase()),
-  );
+  // client-side filtering + sorting
+  let filtered = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()));
+  // apply stock filter
+  filtered = filtered.filter((p) => {
+    if (stockFilter === "all") return true;
+    if (stockFilter === "in") return p.stock > 5;
+    if (stockFilter === "low") return p.stock > 0 && p.stock <= 5;
+    return p.stock === 0;
+  });
+  // category filter (includes parent matching)
+  filtered = filtered.filter((p) => {
+    if (categoryFilter === "all") return true;
+    if (!p.category_id) return false;
+    if (p.category_id === categoryFilter) return true;
+    let cur = categoriesList.find((c) => c.id === p.category_id);
+    while (cur) {
+      if (!cur.parent_id) break;
+      if (cur.parent_id === categoryFilter) return true;
+      cur = categoriesList.find((c) => c.id === cur?.parent_id);
+    }
+    return false;
+  });
+  // price sort
+  if (priceSort) {
+    filtered = [...filtered].sort((a, b) => (priceSort === "asc" ? a.price - b.price : b.price - a.price));
+  }
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -61,10 +89,12 @@ function AdminProducts() {
       toast.error("Erreur lors du chargement des produits.");
       return;
     }
-    // fetch categories names map
+    // fetch categories names map (include parent_id for hierarchical filters)
     try {
-      const { data: cats } = await supabase.from("categories").select("id,name");
-      setCategoriesMap((cats ?? []).reduce((acc: any, c: any) => ({ ...acc, [c.id]: c.name }), {}));
+      const { data: cats } = await supabase.from("categories").select("id,name,parent_id");
+      const catsArr = (cats ?? []).map((c: any) => ({ id: c.id, name: c.name, parent_id: c.parent_id ?? null }));
+      setCategoriesList(catsArr);
+      setCategoriesMap(catsArr.reduce((acc: any, c: any) => ({ ...acc, [c.id]: c.name }), {}));
     } catch (e) {
       console.warn("could not load categories map", e);
     }
@@ -91,6 +121,22 @@ function AdminProducts() {
       tags: [],
     }));
     setList(mapped);
+  };
+
+  const refresh = async () => { await fetchProducts(); };
+
+  const categoryMatches = (productCategoryId: string | null) => {
+    if (categoryFilter === "all") return true;
+    if (!productCategoryId) return false;
+    const target = categoryFilter as string;
+    if (productCategoryId === target) return true;
+    let cur = categoriesList.find((c) => c.id === productCategoryId);
+    while (cur) {
+      if (!cur.parent_id) break;
+      if (cur.parent_id === target) return true;
+      cur = categoriesList.find((c) => c.id === cur?.parent_id);
+    }
+    return false;
   };
 
   const save = async () => {
@@ -136,6 +182,47 @@ function AdminProducts() {
         const { error } = await supabase.from("products").update(upd).eq("id", draft.id);
         if (error) throw error;
         toast.success("Produit mis à jour.");
+      }
+      // ensure variants are persisted
+      const productId = draft.id || (await (async () => {
+        // if we just created the product, reload draft.id from DB
+        const { data: prod } = await supabase.from("products").select("id").eq("slug", slug).maybeSingle();
+        return prod?.id as string;
+      })());
+      if (productId) {
+        await (async function syncVariants() {
+          try {
+            const { data: existing } = await supabase.from("product_variants").select("id").eq("product_id", productId);
+            const existingIds = (existing ?? []).map((e: any) => e.id);
+            // delete removed variants
+            const toDelete = existingIds.filter((id: string) => !draft.variants.some((v) => v.id === id));
+            if (toDelete.length) {
+              await supabase.from("product_variants").delete().in("id", toDelete);
+            }
+            // upsert draft variants
+            for (const v of draft.variants) {
+              const payload: any = {
+                product_id: productId,
+                sku: v.sku || null,
+                price: v.price ?? 0,
+                compare_at_price: v.compare_at_price ?? null,
+                stock_quantity: v.stock ?? 0,
+                is_active: v.is_active ?? true,
+              };
+              if (existingIds.includes(v.id)) {
+                await supabase.from("product_variants").update(payload).eq("id", v.id);
+              } else {
+                const { data: ins } = await supabase.from("product_variants").insert(payload).select().maybeSingle();
+                if (ins) {
+                  // replace temporary id in draft
+                  setDraft((d) => ({ ...d, variants: d.variants.map((x) => (x.id === v.id ? { ...x, id: ins.id, product_id: productId } : x)) }));
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("syncVariants error", e);
+          }
+        })();
       }
       await fetchProducts();
       setOpen(false);
@@ -203,8 +290,27 @@ function AdminProducts() {
           <h1 className="text-2xl font-bold">Produits</h1>
           <p className="text-sm text-muted-foreground">{list.length} produits au catalogue.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className="w-48" />
+          <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as any)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les stocks</SelectItem>
+              <SelectItem value="in">En stock (&gt;5)</SelectItem>
+              <SelectItem value="low">Faible (&le;5)</SelectItem>
+              <SelectItem value="out">Rupture</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value="all">Toutes catégories</SelectItem>
+              {Object.entries(categoriesMap).map(([id, name]) => (<SelectItem key={id} value={id}>{name}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" onClick={refresh} title="Rafraîchir">
+            ↻
+          </Button>
           <Button variant="accent" onClick={() => { setDraft(emptyProduct); setOpen(true); }}>
             <Plus className="h-4 w-4" /> Nouveau produit
           </Button>
@@ -218,7 +324,12 @@ function AdminProducts() {
               <TableHead className="w-16"></TableHead>
               <TableHead>Produit</TableHead>
               <TableHead>Catégorie</TableHead>
-              <TableHead>Prix</TableHead>
+              <TableHead>
+                <button type="button" className="flex items-center gap-2" onClick={() => setPriceSort(priceSort === "asc" ? "desc" : "asc")}>
+                  Prix
+                  {priceSort === "asc" ? "▲" : priceSort === "desc" ? "▼" : null}
+                </button>
+              </TableHead>
               <TableHead>Stock</TableHead>
               <TableHead>Variantes</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -236,7 +347,13 @@ function AdminProducts() {
               filtered.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <img src={p.images[0]?.url} alt="" className="h-10 w-10 rounded-md bg-surface object-cover" />
+                    <Avatar>
+                      {p.images[0]?.url ? (
+                        <AvatarImage src={p.images[0].url} alt={p.name} />
+                      ) : (
+                        <AvatarFallback>{p.name.slice(0, 1)}</AvatarFallback>
+                      )}
+                    </Avatar>
                   </TableCell>
                   <TableCell>
                     <p className="font-medium">{p.name}</p>
@@ -257,9 +374,16 @@ function AdminProducts() {
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
+                      aria-label="Voir"
+                      className="mr-1 rounded p-1.5 text-muted-foreground hover:bg-surface"
+                      onClick={() => setViewProduct(p)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
                       aria-label="Supprimer"
                       className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-destructive"
-                      onClick={() => { setList((prev) => prev.filter((x) => x.id !== p.id)); toast.success("Produit supprimé."); }}
+                      onClick={() => setConfirmDeleteId(p.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -270,6 +394,102 @@ function AdminProducts() {
           </TableBody>
         </Table>
       </div>
+
+      {/* View product dialog */}
+      <Dialog open={Boolean(viewProduct)} onOpenChange={(v) => { if (!v) setViewProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{viewProduct ? viewProduct.name : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-3">
+              {(viewProduct?.images ?? []).map((img) => (
+                <Avatar key={img.id}>
+                  <AvatarImage src={img.url} alt={viewProduct?.name} />
+                </Avatar>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">{viewProduct?.short_description}</p>
+            <p className="font-semibold">{formatPrice(viewProduct?.price ?? 0)}</p>
+            <p className={viewProduct?.stock === 0 ? "font-semibold text-destructive" : ""}>Stock: {viewProduct?.stock}</p>
+
+            {viewProduct?.variants && viewProduct.variants.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-bold">Variantes</h4>
+                <div className="mt-2 space-y-2">
+                  {viewProduct.variants.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between rounded-md border border-border p-2">
+                      <div className="text-xs">
+                        <div className="font-medium">{v.sku || "—"}</div>
+                        <div className="text-muted-foreground">
+                          {Object.entries(v.options || {}).map(([code, val]) => `${code}: ${val}`).join(" / ") || "—"}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{formatPrice(v.price)}</div>
+                        <div className={v.stock === 0 ? "font-semibold text-destructive text-sm" : "text-sm"}>Stock: {v.stock}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setViewProduct(null)}>Fermer</Button>
+              <Button variant="accent" onClick={() => { if (viewProduct) { setDraft(viewProduct); setOpen(true); setViewProduct(null); } }}>Éditer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm delete dialog */}
+      <Dialog open={Boolean(confirmDeleteId)} onOpenChange={(v) => { if (!v) setConfirmDeleteId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+          </DialogHeader>
+          <p>Voulez-vous vraiment supprimer ce produit ? Cette action est irréversible.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Annuler</Button>
+            <Button variant="accent" className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+              const id = confirmDeleteId;
+              if (!id) return;
+              try {
+                // fetch product images
+                const { data: imgs, error: imgErr } = await supabase.from("product_images").select("url").eq("product_id", id);
+                if (imgErr) throw imgErr;
+                for (const img of (imgs ?? []) as any[]) {
+                  const url = img?.url as string | undefined;
+                  if (!url) continue;
+                  const m = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+                  if (m) {
+                    const bucket = m[1]!;
+                    const path = decodeURIComponent(m[2]!);
+                    try {
+                      await deleteFromBucket(bucket, path);
+                    } catch (e) {
+                      console.warn("failed to delete storage object", path, e);
+                    }
+                  }
+                }
+                // delete image rows
+                const { error: delImgsErr } = await supabase.from("product_images").delete().eq("product_id", id);
+                if (delImgsErr) throw delImgsErr;
+                // delete product
+                const { error } = await supabase.from("products").delete().eq("id", id);
+                if (error) throw error;
+                setList((p) => p.filter((x) => x.id !== id));
+                toast.success("Produit supprimé.");
+              } catch (err) {
+                console.error(err);
+                toast.error("Impossible de supprimer le produit.");
+              } finally {
+                setConfirmDeleteId(null);
+              }
+            }}>Supprimer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">

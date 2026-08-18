@@ -188,8 +188,8 @@ function AdminCategories() {
       // try to extract bucket/path from public URL: /storage/v1/object/public/<bucket>/<path>
       const m = draft.image_url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
       if (m) {
-        const bucket = m[1];
-        const path = decodeURIComponent(m[2]);
+        const bucket = m[1]!;
+        const path = decodeURIComponent(m[2]!);
         await deleteFromBucket(bucket, path);
       }
       if (draft.id) {
