@@ -21,10 +21,7 @@ export default function ProductGeneral({
         <Label>Nom</Label>
         <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </div>
-      <div className="space-y-2">
-        <Label>Marque</Label>
-        <Input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
-      </div>
+     
       <div className="space-y-2">
         <Label>Catégorie</Label>
         <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
@@ -35,23 +32,46 @@ export default function ProductGeneral({
             ))}
           </SelectContent>
         </Select>
+       
       </div>
+       <div className="space-y-2">
+        <Label>Marque</Label>
+        <Input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
+      </div>
+     
       <div className="space-y-2">
         <Label>Prix (DT)</Label>
-        <Input type="number" value={draft.price} onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })} />
+        <Input
+          type="number"
+          value={draft.variants.length > 0 ? (draft.variants[0]?.price ?? draft.price) : draft.price}
+          onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
+          disabled={draft.variants.length > 0}
+          className={draft.variants.length > 0 ? "bg-muted/60 text-muted-foreground" : ""}
+        />
+        {draft.variants.length > 0 && (
+          <p className="text-xs text-muted-foreground">Le prix est défini par variante ; le prix du produit sert uniquement de référence pour les nouvelles variantes.</p>
+        )}
       </div>
-      <div className="space-y-2">
-        <Label>Prix barré (DT)</Label>
-        <Input type="number" value={draft.compare_at_price ?? ""} onChange={(e) => setDraft({ ...draft, compare_at_price: e.target.value ? Number(e.target.value) : null })} />
-      </div>
-      <div className="space-y-2">
+
+        <div className="space-y-2">
         <Label>Stock</Label>
-        <Input type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })} />
+        <Input
+          type="number"
+          value={draft.variants.length > 0 ? draft.variants.reduce((sum, v) => sum + Number(v.stock ?? 0), 0) : draft.stock}
+          onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })}
+          disabled={draft.variants.length > 0}
+          className={draft.variants.length > 0 ? "bg-muted/60 text-muted-foreground" : ""}
+        />
+        {draft.variants.length > 0 && (
+          <p className="text-xs text-muted-foreground">Le stock global est calculé automatiquement à partir de la somme des variantes.</p>
+        )}
       </div>
-      <div className="space-y-2">
+   
+    
+      {/* <div className="space-y-2">
         <Label>Slug</Label>
         <Input value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} placeholder="auto" />
-      </div>
+      </div> */}
       <div className="space-y-2 sm:col-span-2">
         <Label>Description courte</Label>
         <Input value={draft.short_description} onChange={(e) => setDraft({ ...draft, short_description: e.target.value })} />

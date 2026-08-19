@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Package } from "lucide-react";
-import { ORDER_STATUS_LABELS } from "@/data/orders";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from "@/data/orders";
 import { formatPrice, mockImage } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,13 +13,7 @@ export const Route = createFileRoute("/compte/commandes")({
   component: AccountOrders,
 });
 
-const statusStyle: Record<OrderStatus, string> = {
-  pending: "bg-warning/15 text-warning",
-  confirmed: "bg-accent-strong/10 text-accent-strong",
-  shipped: "bg-chart-2/15 text-chart-2",
-  delivered: "bg-success/15 text-success",
-  cancelled: "bg-destructive/10 text-destructive",
-};
+// centralized ORDER_STATUS_STYLES imported from data/orders
 
 function AccountOrders() {
   const { profile, loading: authLoading } = useAuth();
@@ -123,7 +117,7 @@ function AccountOrders() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", statusStyle[order.status])}>
+                  <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", ORDER_STATUS_STYLES[order.status])}>
                     {ORDER_STATUS_LABELS[order.status]}
                   </span>
                   <span className="font-bold">{formatPrice(order.total)}</span>

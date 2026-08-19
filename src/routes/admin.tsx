@@ -27,13 +27,13 @@ export const Route = createFileRoute("/admin")({
 
 const nav = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
   { to: "/admin/produits", label: "Produits", icon: Package, exact: false },
-  { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
-  { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
-  { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
-  { to: "/admin/clients", label: "Clients", icon: User, exact: false },
   { to: "/admin/commandes", label: "Commandes", icon: ShoppingBag, exact: false },
+  { to: "/admin/clients", label: "Clients", icon: User, exact: false },
+  { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
+  { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
+  { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
+  { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
   { to: "/admin/parametres", label: "Paramètres", icon: User, exact: false },
 ] as const;
 

@@ -367,5 +367,103 @@ create trigger trg_orders_number before insert on orders
     end;
   );
 
+-- ---------------------------------------------------------
+-- 12. Ajout des champs promo stockés et routines de mise à jour
+-- ---------------------------------------------------------
+alter table products
+  add column if not exists promo_percent numeric(5,2) default 0,
+  add column if not exists price_after_promo numeric(10,3);
+
+alter table product_variants
+  add column if not exists promo_percent numeric(5,2) default 0,
+  add column if not exists price_after_promo numeric(10,3);
+
+-- calcule et stocke la promo pour un produit ou une variante
+create or replace function refresh_promo_for_item(p_product_id uuid, p_variant_id uuid default null)
+returns void language plpgsql stable as $$
+declare
+  v_price numeric;
+  v_id uuid;
+  v_type text;
+  v_value numeric;
+  v_effective numeric;
+  v_percent numeric := 0;
+begin
+  if p_variant_id is not null then
+    select price into v_price from product_variants where id = p_variant_id;
+  else
+    select base_price into v_price from products where id = p_product_id;
+  end if;
+
+  if v_price is null then
+    return;
+  end if;
+
+  -- trouver la promotion applicable (variante prioritaire)
+  select id, discount_type, discount_value
+    into v_id, v_type, v_value
+  from promotions
+  where is_active = true
+    and ( (variant_id is not null and variant_id = p_variant_id)
+       or (variant_id is null and product_id = p_product_id) )
+    and (starts_at is null or starts_at <= now())
+    and (ends_at is null or ends_at >= now())
+  order by (case when variant_id is not null then 0 else 1 end), discount_value desc
+  limit 1;
+
+  if v_id is null then
+    v_effective := v_price;
+    v_percent := 0;
+  else
+    if v_type = 'percentage' then
+      v_percent := v_value;
+      v_effective := round(greatest(0, v_price * (1 - v_value / 100))::numeric, 3);
+    elsif v_type = 'fixed' then
+      v_effective := round(greatest(0, v_price - v_value)::numeric, 3);
+      v_percent := case when v_price > 0 then round(((v_price - v_effective) / v_price) * 100, 3) else 0 end;
+    else
+      v_effective := v_price;
+      v_percent := 0;
+    end if;
+  end if;
+
+  if p_variant_id is not null then
+    update product_variants set promo_percent = v_percent, price_after_promo = v_effective where id = p_variant_id;
+  else
+    update products set promo_percent = v_percent, price_after_promo = v_effective where id = p_product_id;
+  end if;
+
+  return;
+end;
+$$;
+
+-- trigger pour rafraîchir les champs stockés quand une promotion change
+create or replace function trg_promotions_refresh() returns trigger as $$
+begin
+  -- sur insert/update: refresh for NEW target
+  if (tg_op = 'INSERT' or tg_op = 'UPDATE') then
+    perform refresh_promo_for_item(NEW.product_id, NEW.variant_id);
+  end if;
+
+  -- sur update/delete: aussi rafraîchir pour l'ancienne cible si différente
+  if (tg_op = 'UPDATE' or tg_op = 'DELETE') then
+    if TG_OP = 'DELETE' then
+      perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+    elsif TG_OP = 'UPDATE' then
+      if OLD.product_id is distinct from NEW.product_id or OLD.variant_id is distinct from NEW.variant_id then
+        perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+      end if;
+    end if;
+  end if;
+
+  return null;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_promotions_refresh on promotions;
+create trigger trg_promotions_refresh after insert or update or delete on promotions
+  for each row execute procedure trg_promotions_refresh();
+
+
 -- NOTE: à dupliquer/adapter pour attributes, attribute_values, product_variants (write),
 -- promotions, coupons, order_items, addresses, carts, cart_items etc.

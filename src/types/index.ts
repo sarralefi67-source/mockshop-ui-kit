@@ -938,6 +938,8 @@ export type ProductVariant = {
   options: Record<string, string>
   price: number
   compare_at_price: number | null
+  promo_percent?: number | null
+  price_after_promo?: number | null
   stock: number
   is_active: boolean
   position?: number
@@ -953,6 +955,8 @@ export type Product = {
   description: string
   price: number
   compare_at_price: number | null
+  promo_percent?: number | null
+  price_after_promo?: number | null
   stock: number
   sku: string
   is_active: boolean
@@ -974,7 +978,7 @@ export type OrderItem = {
   variant_id: string | null
   name: string
   variant_label: string | null
-  image: string
+  image: string | null
   unit_price: number
   quantity: number
 }
@@ -984,13 +988,17 @@ export type Order = {
   order_number?: string
   reference: string
   customer_name: string
+  customer_email?: string
   customer_phone: string
+  address_line?: string
+  city?: string
   status: OrderStatus
   payment_method?: string
   subtotal: number
   shipping: number
   discount: number
   total: number
+  notes?: string | null
   governorate: string
   created_at: string | null
   items: OrderItem[]

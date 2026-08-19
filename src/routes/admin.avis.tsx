@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Trash2 } from "lucide-react";
+import SortArrow from "@/components/ui/sort-arrow";
 
 export const Route = createFileRoute("/admin/avis")({
   component: AdminAvis,
@@ -185,7 +186,7 @@ export default function AdminAvis() {
                     onClick={() => setSortDir((s) => (s === "desc" ? "asc" : "desc"))}
                   >
                     <span>Note</span>
-                    <span aria-label="Trier par note">{sortDir === "desc" ? "↓" : "↑"}</span>
+                    <SortArrow dir={sortDir === "desc" ? "desc" : "asc"} ariaLabel="Trier par note" />
                   </button>
                 </TableHead>
                 <TableHead>Commentaire</TableHead>
