@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { addresses as seedAddresses } from "@/data/orders";
-import { GOVERNORATES } from "@/data/coupons";
+import { GOVERNORATES } from "@/data/governorates";
 import type { Address } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

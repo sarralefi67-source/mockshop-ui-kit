@@ -1,5 +1,4 @@
 import type { Product, ProductAttribute, ProductImage, ProductVariant } from "@/types";
-import { mockImage } from "@/lib/placeholder";
 
 interface Seed {
   id: string;
@@ -168,27 +167,87 @@ function buildProduct(seed: Seed): Product {
     });
   }
 
+  const realImageSet = {
+    "p-1": [
+      "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-2": [
+      "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-3": [
+      "https://images.unsplash.com/photo-1511467685653-c1d4d2f2d4d8?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1541140532154-b024d705b90a?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-4": [
+      "https://images.unsplash.com/photo-1587502537745-84b86da1204f?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1555618564-2725b263e173?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-5": [
+      "https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1556656793-08538906a9f8?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-6": [
+      "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1484704849707-f032a568e944?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-7": [
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-8": [
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1445116572660-236099ec97a0?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-9": [
+      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1434056886845-dac89ffe9b56?auto=format&fit=crop&w=900&q=80",
+    ],
+    "p-10": [
+      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
+    ],
+  } as const;
+
   const images: ProductImage[] = [];
+  const baseUrls = realImageSet[seed.id as keyof typeof realImageSet] ?? [
+    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80",
+  ];
+
   if (seed.colors) {
     seed.colors.forEach((c, ci) => {
+      const urls = baseUrls.length > 0 ? baseUrls : ["https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80"];
       images.push(
         {
           id: `${seed.id}-img-${c.id}-1`, product_id: seed.id,
-          url: mockImage(seed.brand, c.hex, c.label),
+          url: urls[ci % urls.length] ?? urls[0],
           alt: `${seed.name} — ${c.label}`, position: ci * 2, variant_value: c.id,
         },
         {
           id: `${seed.id}-img-${c.id}-2`, product_id: seed.id,
-          url: mockImage(seed.brand, c.hex, `${c.label} · détail`),
+          url: urls[(ci + 1) % urls.length] ?? urls[0],
           alt: `${seed.name} — ${c.label} détail`, position: ci * 2 + 1, variant_value: c.id,
         },
       );
     });
   } else {
     images.push(
-      { id: `${seed.id}-img-1`, product_id: seed.id, url: mockImage(seed.brand, "#cfd4da", seed.brand), alt: seed.name, position: 0, variant_value: null },
-      { id: `${seed.id}-img-2`, product_id: seed.id, url: mockImage(seed.brand, "#e2d9cf", "Détail"), alt: `${seed.name} détail`, position: 1, variant_value: null },
-      { id: `${seed.id}-img-3`, product_id: seed.id, url: mockImage(seed.brand, "#d5dcd6", "Packaging"), alt: `${seed.name} packaging`, position: 2, variant_value: null },
+      { id: `${seed.id}-img-1`, product_id: seed.id, url: baseUrls[0] ?? "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80", alt: seed.name, position: 0, variant_value: null },
+      { id: `${seed.id}-img-2`, product_id: seed.id, url: baseUrls[1] ?? "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80", alt: `${seed.name} détail`, position: 1, variant_value: null },
+      { id: `${seed.id}-img-3`, product_id: seed.id, url: baseUrls[2] ?? "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80", alt: `${seed.name} packaging`, position: 2, variant_value: null },
     );
   }
 

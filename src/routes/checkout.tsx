@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { BadgePercent, Banknote, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { useStore } from "@/context/StoreContext";
-import { GOVERNORATES } from "@/data/coupons";
+import { GOVERNORATES } from "@/data/governorates";
 import { formatPrice } from "@/lib/placeholder";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,16 +31,56 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function CheckoutPage() {
-  const { items, subtotal, shipping, total, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
+  const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [shippingRates, setShippingRates] = useState<Record<string, number>>({});
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadShippingRates() {
+      try {
+        const { data, error } = await supabase
+          .from("shipping_rates")
+          .select("governorate, price")
+          .eq("is_active", true);
+        if (error) throw error;
+        if (!mounted) return;
+        const map: Record<string, number> = {};
+        (data ?? []).forEach((rate: { governorate: string; price: number | string | null }) => {
+          if (rate.governorate) {
+            map[rate.governorate] = Number(rate.price ?? 0);
+          }
+        });
+        setShippingRates(map);
+      } catch (err) {
+        console.error("loadShippingRates", err);
+        toast.error("Impossible de charger les frais de livraison.");
+      }
+    }
+
+    loadShippingRates();
+    return () => { mounted = false; };
+  }, []);
+
+  const availableGovernorates = useMemo(
+    () => GOVERNORATES.filter((g) => shippingRates[g] !== undefined && Number(shippingRates[g]) >= 0),
+    [shippingRates],
+  );
+
+  const shipping = items.length === 0 ? 0 : Number(shippingRates[governorate] ?? 0);
+  const total = Math.max(0, subtotal - (coupon?.discount ?? 0)) + shipping;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!governorate) {
       toast.error("Veuillez choisir un gouvernorat.");
+      return;
+    }
+    if (!shippingRates[governorate]) {
+      toast.error("La livraison n'est pas disponible pour ce gouvernorat.");
       return;
     }
     setSubmitting(true);
@@ -111,9 +152,9 @@ function CheckoutPage() {
                 <div className="space-y-2">
                   <Label htmlFor="gov">Gouvernorat</Label>
                   <Select value={governorate} onValueChange={setGovernorate}>
-                    <SelectTrigger id="gov"><SelectValue placeholder="Choisir…" /></SelectTrigger>
+                    <SelectTrigger id="gov"><SelectValue placeholder={availableGovernorates.length ? "Choisir…" : "Aucun gouvernorat disponible"} /></SelectTrigger>
                     <SelectContent className="max-h-72">
-                      {GOVERNORATES.map((g) => (
+                      {availableGovernorates.map((g) => (
                         <SelectItem key={g} value={g}>{g}</SelectItem>
                       ))}
                     </SelectContent>

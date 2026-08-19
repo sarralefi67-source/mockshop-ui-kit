@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   BadgePercent, ChevronLeft, LayoutDashboard, ListTree, Menu, Package, ShoppingBag, Store,
-  Bell, User, LogOut,
+  Bell, User, LogOut, MessageCircle, Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,11 @@ const nav = [
   { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
   { to: "/admin/produits", label: "Produits", icon: Package, exact: false },
   { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
+  { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
+  { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
+  { to: "/admin/clients", label: "Clients", icon: User, exact: false },
   { to: "/admin/commandes", label: "Commandes", icon: ShoppingBag, exact: false },
+  { to: "/admin/parametres", label: "Paramètres", icon: User, exact: false },
 ] as const;
 
 function AdminLayout() {
@@ -39,6 +43,8 @@ function AdminLayout() {
   const { user, profile, loading, signIn, signOut } = useAuth();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const displayName = profile?.first_name ? `${profile.first_name}${profile?.last_name ? ` ${profile.last_name}` : ""}` : user?.email;
 
   useEffect(() => {
     // if logged in but not admin, redirect away
@@ -114,10 +120,7 @@ function AdminLayout() {
         )}
       >
         <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-accent-strong text-sm font-black text-accent-strong-foreground">
-            N
-          </span>
-          <span className="font-extrabold">Admin</span>
+        
           <button className="ml-auto lg:hidden" onClick={() => setOpen(false)} aria-label="Fermer">
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -159,11 +162,11 @@ function AdminLayout() {
           <button className="lg:hidden" onClick={() => setOpen(true)} aria-label="Ouvrir le menu">
             <Menu className="h-6 w-6" />
           </button>
-         
+
           <div className="ml-auto flex items-center gap-3">
             <button
               aria-label="Notifications"
-              onClick={() => navigate({ to: "/admin/notifications" })}
+              onClick={() => navigate({ to: "/admin" })}
               className="relative rounded-md p-2 text-muted-foreground hover:bg-surface"
             >
               <Bell className="h-5 w-5" />
@@ -178,7 +181,7 @@ function AdminLayout() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent-strong text-xs font-semibold text-accent-strong-foreground">
                   {user?.email?.charAt(0).toUpperCase() ?? "U"}
                 </span>
-                <span className="hidden sm:block text-sm">{profile?.display_name ?? user?.email}</span>
+                <span className="hidden sm:block text-sm">{displayName}</span>
               </button>
 
               {userMenuOpen && (
@@ -187,7 +190,7 @@ function AdminLayout() {
                     className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface"
                     onClick={() => {
                       setUserMenuOpen(false);
-                      navigate({ to: "/compte" });
+                      navigate({ to: "/admin/parametres" });
                     }}
                   >
                     <User className="h-4 w-4" /> Paramètres

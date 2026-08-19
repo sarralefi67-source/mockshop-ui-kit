@@ -1,4 +1,5 @@
 import type { Coupon, Promotion } from "@/types";
+import { GOVERNORATES } from "@/data/governorates";
 
 export const coupons: Coupon[] = [
   {
@@ -69,11 +70,6 @@ export const promotions: Promotion[] = [
   },
 ];
 
-export const GOVERNORATES = [
-  "Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba",
-  "Kairouan", "Kasserine", "Kébili", "Le Kef", "Mahdia", "La Manouba",
-  "Médenine", "Monastir", "Nabeul", "Sfax", "Sidi Bouzid", "Siliana",
-  "Sousse", "Tataouine", "Tozeur", "Tunis", "Zaghouan",
-];
+// GOVERNORATES moved to src/data/governorates.ts
 
 export const SHIPPING_FEE = 7;

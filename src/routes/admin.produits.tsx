@@ -13,6 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ProductGeneral from "@/components/admin/ProductGeneral";
+import ProductImages from "@/components/admin/ProductImages";
+import AttributesVariants from "@/components/admin/AttributesVariants";
+import { ProductGallery } from "@/components/store/ProductGallery";
+import { ProductDetails } from "@/components/store/ProductDetails";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -81,8 +86,15 @@ function AdminProducts() {
     setLoading(true);
     const { data, error } = await supabase
       .from("products")
-      .select("*, product_images(*), product_variants(*)")
-      .order("created_at", { ascending: false });
+      .select(`
+        *,
+        product_images(*),
+        product_variants(*, variant_attribute_values(attribute_value_id)),
+        product_attributes(attribute_id, attributes(id, name, display_type, attribute_values(*)))
+      `)
+      .order("created_at", { ascending: false })
+      .order("position", { referencedTable: "product_images", ascending: true })
+      .order("position", { referencedTable: "product_variants", ascending: true });
     setLoading(false);
     if (error) {
       console.error(error);
@@ -98,32 +110,72 @@ function AdminProducts() {
     } catch (e) {
       console.warn("could not load categories map", e);
     }
-    const mapped = (data ?? []).map((d: any) => ({
-      id: d.id,
-      name: d.name,
-      slug: d.slug,
-      brand: d.brand ?? "",
-      category_id: d.category_id,
-      short_description: d.short_description ?? "",
-      description: d.description ?? "",
-      price: Number(d.base_price ?? 0),
-      compare_at_price: d.compare_at_price ? Number(d.compare_at_price) : null,
-      stock: d.stock_quantity ?? 0,
-      sku: d.sku ?? "",
-      is_active: d.is_active ?? true,
-      is_new: false,
-      rating: 0,
-      reviews_count: 0,
-      created_at: d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
-      images: (d.product_images ?? []).map((img: any) : ProductImage => ({ id: img.id, product_id: d.id, url: img.url, alt: "", position: img.position ?? 0, variant_value: null })),
-      attributes: [],
-      variants: (d.product_variants ?? []).map((v: any) : ProductVariant => ({ id: v.id, product_id: d.id, sku: v.sku ?? "", options: {}, price: Number(v.price), compare_at_price: v.compare_at_price ? Number(v.compare_at_price) : null, stock: v.stock_quantity ?? 0, is_active: v.is_active ?? true })),
-      tags: [],
-    }));
+    const mapped = (data ?? []).map((d: any) => {
+      // build this product's attribute list (id/name/type/values) from product_attributes -> attributes
+      const attributes: ProductAttribute[] = (d.product_attributes ?? [])
+        .map((pa: any) => pa.attributes)
+        .filter(Boolean)
+        .map((a: any): ProductAttribute => ({
+          id: a.id,
+          name: a.name,
+          code: a.id, // the real attribute id doubles as the stable key used in variant.options
+          type: a.display_type === "color_swatch" ? "swatch" : "button",
+          values: (a.attribute_values ?? [])
+            .slice()
+            .sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0))
+            .map((v: any) => ({ id: v.id, label: v.value, hex: v.color_hex ?? undefined })),
+        }));
+
+      return {
+        id: d.id,
+        name: d.name,
+        slug: d.slug,
+        brand: d.brand ?? "",
+        category_id: d.category_id,
+        short_description: d.short_description ?? "",
+        description: d.description ?? "",
+        price: Number(d.base_price ?? 0),
+        compare_at_price: d.compare_at_price ? Number(d.compare_at_price) : null,
+        stock: d.stock_quantity ?? 0,
+        sku: d.sku ?? "",
+        is_active: d.is_active ?? true,
+        is_new: false,
+        rating: 0,
+        reviews_count: 0,
+        created_at: d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        images: (d.product_images ?? []).map((img: any): ProductImage => ({
+          id: img.id, product_id: d.id, url: img.url, alt: "",
+          position: img.position ?? 0, is_main: img.is_main ?? false, variant_value: img.variant_value ?? null,
+        })),
+        attributes,
+        variants: (d.product_variants ?? []).map((v: any): ProductVariant => ({
+          id: v.id,
+          product_id: d.id,
+          sku: v.sku ?? "",
+          // rebuild {attribute_id: attribute_value_id} from the join table
+          options: (v.variant_attribute_values ?? []).reduce((acc: Record<string, string>, link: any) => {
+            const val = link.attribute_value_id as string;
+            const attr = attributes.find((a) => a.values.some((x) => x.id === val));
+            if (attr) acc[attr.id] = val;
+            return acc;
+          }, {}),
+          price: Number(v.price),
+          compare_at_price: v.compare_at_price ? Number(v.compare_at_price) : null,
+          stock: v.stock_quantity ?? 0,
+          is_active: v.is_active ?? true,
+          position: v.position ?? 0,
+        })),
+        tags: [],
+      };
+    });
     setList(mapped);
   };
 
   const refresh = async () => { await fetchProducts(); };
+
+  // image à afficher en priorité: celle marquée is_main, sinon la première par position
+  const mainImage = (images: ProductImage[]) =>
+    images.find((i) => i.is_main) ?? [...images].sort((a, b) => a.position - b.position)[0];
 
   const categoryMatches = (productCategoryId: string | null) => {
     if (categoryFilter === "all") return true;
@@ -147,83 +199,141 @@ function AdminProducts() {
     const slug = draft.slug.trim() || draft.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
     try {
-      if (!draft.id) {
-        const insert = {
-          name: draft.name,
-          slug,
-          brand: draft.brand || null,
-          category_id: draft.category_id || null,
-          short_description: draft.short_description || null,
-          description: draft.description || null,
-          base_price: draft.price || 0,
-          sku: draft.sku || `SKU-${Date.now()}`,
-          has_variants: draft.variants.length > 0,
-          stock_quantity: draft.stock,
-          is_active: draft.is_active,
-        };
-        const { data, error } = await supabase.from("products").insert(insert).select().single();
+      // ---- 1) produit ----
+      let productId = draft.id;
+      const productPayload = {
+        name: draft.name,
+        slug,
+        brand: draft.brand || null,
+        category_id: draft.category_id || null,
+        short_description: draft.short_description || null,
+        description: draft.description || null,
+        base_price: draft.price || 0,
+        sku: draft.sku || `SKU-${Date.now()}`,
+        has_variants: draft.variants.length > 0,
+        stock_quantity: draft.stock,
+        is_active: draft.is_active,
+      };
+      if (!productId) {
+        const { data, error } = await supabase.from("products").insert(productPayload).select().single();
         if (error) throw error;
-        setDraft({ ...draft, id: data.id });
-        toast.success("Produit créé.");
+        productId = data.id;
+        // update draft with DB-generated fields so the UI shows them immediately
+        setDraft((d) => ({ ...d, id: productId, sku: data.sku ?? d.sku, created_at: data.created_at ? data.created_at.slice(0, 10) : d.created_at }));
       } else {
-        const upd = {
-          name: draft.name,
-          slug,
-          brand: draft.brand || null,
-          category_id: draft.category_id || null,
-          short_description: draft.short_description || null,
-          description: draft.description || null,
-          base_price: draft.price || 0,
-          sku: draft.sku || null,
-          has_variants: draft.variants.length > 0,
-          stock_quantity: draft.stock,
-          is_active: draft.is_active,
-        };
-        const { error } = await supabase.from("products").update(upd).eq("id", draft.id);
+        const { error } = await supabase.from("products").update(productPayload).eq("id", productId);
         if (error) throw error;
-        toast.success("Produit mis à jour.");
       }
-      // ensure variants are persisted
-      const productId = draft.id || (await (async () => {
-        // if we just created the product, reload draft.id from DB
-        const { data: prod } = await supabase.from("products").select("id").eq("slug", slug).maybeSingle();
-        return prod?.id as string;
-      })());
-      if (productId) {
-        await (async function syncVariants() {
-          try {
-            const { data: existing } = await supabase.from("product_variants").select("id").eq("product_id", productId);
-            const existingIds = (existing ?? []).map((e: any) => e.id);
-            // delete removed variants
-            const toDelete = existingIds.filter((id: string) => !draft.variants.some((v) => v.id === id));
-            if (toDelete.length) {
-              await supabase.from("product_variants").delete().in("id", toDelete);
-            }
-            // upsert draft variants
-            for (const v of draft.variants) {
-              const payload: any = {
-                product_id: productId,
-                sku: v.sku || null,
-                price: v.price ?? 0,
-                compare_at_price: v.compare_at_price ?? null,
-                stock_quantity: v.stock ?? 0,
-                is_active: v.is_active ?? true,
-              };
-              if (existingIds.includes(v.id)) {
-                await supabase.from("product_variants").update(payload).eq("id", v.id);
-              } else {
-                const { data: ins } = await supabase.from("product_variants").insert(payload).select().maybeSingle();
-                if (ins) {
-                  // replace temporary id in draft
-                  setDraft((d) => ({ ...d, variants: d.variants.map((x) => (x.id === v.id ? { ...x, id: ins.id, product_id: productId } : x)) }));
-                }
-              }
-            }
-          } catch (e) {
-            console.warn("syncVariants error", e);
+
+      // ---- 2) attributs + valeurs (couleur, taille…) ----
+      // On travaille sur une copie locale pour résoudre les ids réels tout de suite
+      // (setDraft est asynchrone, on ne peut pas compter dessus dans la même fonction).
+      const workingAttributes = draft.attributes.map((a) => ({ ...a, values: a.values.map((v) => ({ ...v })) }));
+      const oldValueIdToNewValueId: Record<string, string> = {};
+
+      for (const attr of workingAttributes) {
+        const attrPayload = {
+          name: attr.name,
+          display_type: attr.type === "swatch" ? "color_swatch" : "select",
+        };
+        const isNewAttr = attr.id.startsWith("attr-");
+        if (isNewAttr) {
+          const { data, error } = await supabase.from("attributes").insert(attrPayload).select().single();
+          if (error) throw error;
+          attr.id = data.id;
+        } else {
+          const { error } = await supabase.from("attributes").update(attrPayload).eq("id", attr.id);
+          if (error) throw error;
+        }
+        // lien produit <-> attribut (idempotent)
+        const { error: linkErr } = await supabase
+          .from("product_attributes")
+          .upsert({ product_id: productId, attribute_id: attr.id }, { onConflict: "product_id,attribute_id" });
+        if (linkErr) throw linkErr;
+
+        for (const [i, val] of attr.values.entries()) {
+          const oldId = val.id;
+          const valPayload = {
+            attribute_id: attr.id,
+            value: val.label,
+            color_hex: attr.type === "swatch" ? (val.hex ?? null) : null,
+            position: i,
+          };
+          if (oldId.startsWith("val-")) {
+            const { data, error } = await supabase.from("attribute_values").insert(valPayload).select().single();
+            if (error) throw error;
+            val.id = data.id;
+          } else {
+            const { error } = await supabase.from("attribute_values").update(valPayload).eq("id", val.id);
+            if (error) throw error;
           }
-        })();
+          oldValueIdToNewValueId[oldId] = val.id;
+        }
       }
+
+      // supprimer les attributs retirés du produit (juste le lien produit<->attribut, on ne
+      // touche pas à la table `attributes` qui pourrait être référencée ailleurs)
+      if (draft.id) {
+        const { data: existingLinks } = await supabase.from("product_attributes").select("attribute_id").eq("product_id", productId);
+        const keepAttrIds = workingAttributes.map((a) => a.id);
+        const toUnlink = (existingLinks ?? []).map((l: any) => l.attribute_id).filter((id: string) => !keepAttrIds.includes(id));
+        if (toUnlink.length) {
+          const { error } = await supabase.from("product_attributes").delete().eq("product_id", productId).in("attribute_id", toUnlink);
+          if (error) throw error;
+        }
+      }
+
+      // ---- 3) variantes ----
+      const { data: existingVariantsRows } = await supabase.from("product_variants").select("id").eq("product_id", productId);
+      const existingVariantIds = (existingVariantsRows ?? []).map((e: any) => e.id);
+      const keptVariantIds: string[] = [];
+
+      for (const [i, v] of draft.variants.entries()) {
+        const isNewVariant = !existingVariantIds.includes(v.id);
+        const payload = {
+          product_id: productId,
+          // un SKU vide ou dupliqué fait échouer l'insert (colonne UNIQUE) : on force un SKU
+          // unique par défaut plutôt que de laisser Postgres rejeter silencieusement la ligne.
+          sku: v.sku?.trim() || `${slug.toUpperCase()}-VAR-${Date.now()}-${i}`,
+          price: v.price ?? 0,
+          compare_at_price: v.compare_at_price ?? null,
+          stock_quantity: v.stock ?? 0,
+          is_active: v.is_active ?? true,
+          position: i,
+        };
+        let variantId = v.id;
+        if (isNewVariant) {
+          const { data, error } = await supabase.from("product_variants").insert(payload).select().single();
+          if (error) throw error;
+          variantId = data.id;
+          // replace temporary variant id in draft with DB id so generated fields appear
+          setDraft((d) => ({ ...d, variants: d.variants.map((vv) => (vv.id === v.id ? { ...vv, id: variantId } : vv)) }));
+        } else {
+          const { error } = await supabase.from("product_variants").update(payload).eq("id", variantId);
+          if (error) throw error;
+        }
+        keptVariantIds.push(variantId);
+
+        // lien variante <-> valeurs d'attribut choisies (couleur/taille…)
+        const resolvedValueIds = Object.values(v.options || {}).map((valId) => oldValueIdToNewValueId[valId] ?? valId);
+        const { error: delLinksErr } = await supabase.from("variant_attribute_values").delete().eq("variant_id", variantId);
+        if (delLinksErr) throw delLinksErr;
+        if (resolvedValueIds.length) {
+          const { error: insLinksErr } = await supabase
+            .from("variant_attribute_values")
+            .insert(resolvedValueIds.map((attribute_value_id) => ({ variant_id: variantId, attribute_value_id })));
+          if (insLinksErr) throw insLinksErr;
+        }
+      }
+
+      // supprimer les variantes retirées du produit (cascade sur variant_attribute_values / variant_images)
+      const toDeleteVariants = existingVariantIds.filter((id: string) => !keptVariantIds.includes(id));
+      if (toDeleteVariants.length) {
+        const { error } = await supabase.from("product_variants").delete().in("id", toDeleteVariants);
+        if (error) throw error;
+      }
+
+      toast.success(draft.id ? "Produit mis à jour." : "Produit créé.");
       await fetchProducts();
       setOpen(false);
     } catch (err) {
@@ -231,8 +341,10 @@ function AdminProducts() {
       const msg = (err as any)?.message ?? String(err);
       if (msg.includes("violates row-level security") || msg.includes("row-level security")) {
         toast.error("Insertion refusée par les policies RLS — vérifiez les policies DB ou connectez-vous en tant qu'admin.");
+      } else if (msg.includes("duplicate key") || msg.includes("already exists")) {
+        toast.error("Un SKU identique existe déjà — changez le SKU de la variante en conflit.");
       } else {
-        toast.error("Erreur lors de l'enregistrement.");
+        toast.error(`Erreur lors de l'enregistrement : ${msg}`);
       }
     }
   };
@@ -255,6 +367,17 @@ function AdminProducts() {
       attributes: draft.attributes.map((a: ProductAttribute) => (a.id === id ? { ...a, ...patch } : a)),
     });
 
+  const removeAttribute = (id: string) =>
+    setDraft({
+      ...draft,
+      attributes: draft.attributes.filter((a) => a.id !== id),
+      // on retire aussi ce choix de toutes les variantes qui l'utilisaient
+      variants: draft.variants.map((v) => {
+        const { [id]: _removed, ...rest } = v.options;
+        return { ...v, options: rest };
+      }),
+    });
+
   const addValue = (attrId: string) =>
     updateAttribute(attrId, {
       values: [
@@ -273,6 +396,7 @@ function AdminProducts() {
       compare_at_price: draft.compare_at_price,
       stock: 0,
       is_active: true,
+      position: draft.variants.length,
     };
     setDraft({ ...draft, variants: [...draft.variants, variant] });
   };
@@ -283,49 +407,75 @@ function AdminProducts() {
       variants: draft.variants.map((v: ProductVariant) => (v.id === id ? { ...v, ...patch } : v)),
     });
 
+  // fixe la valeur choisie pour un attribut donné (ex: Couleur -> Rouge) sur une variante
+  const setVariantOption = (variantId: string, attributeId: string, valueId: string) =>
+    setDraft({
+      ...draft,
+      variants: draft.variants.map((v) =>
+        v.id === variantId ? { ...v, options: { ...v.options, [attributeId]: valueId } } : v
+      ),
+    });
+
+  const moveVariant = (id: string, dir: -1 | 1) => {
+    const idx = draft.variants.findIndex((v) => v.id === id);
+    const swapIdx = idx + dir;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= draft.variants.length) return;
+    const next = [...draft.variants];
+    const a = next[idx];
+    const b = next[swapIdx];
+    if (!a || !b) return;
+    next[idx] = b;
+    next[swapIdx] = a;
+    setDraft({ ...draft, variants: next.map((v, i) => ({ ...v, position: i })) });
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-bold">Produits</h1>
           <p className="text-sm text-muted-foreground">{list.length} produits au catalogue.</p>
         </div>
-        <div className="flex gap-2 items-center">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className="w-48" />
-          <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as any)}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les stocks</SelectItem>
-              <SelectItem value="in">En stock (&gt;5)</SelectItem>
-              <SelectItem value="low">Faible (&le;5)</SelectItem>
-              <SelectItem value="out">Rupture</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-            <SelectContent className="max-h-72">
-              <SelectItem value="all">Toutes catégories</SelectItem>
-              {Object.entries(categoriesMap).map(([id, name]) => (<SelectItem key={id} value={id}>{name}</SelectItem>))}
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" onClick={refresh} title="Rafraîchir">
-            ↻
-          </Button>
-          <Button variant="accent" onClick={() => { setDraft(emptyProduct); setOpen(true); }}>
-            <Plus className="h-4 w-4" /> Nouveau produit
-          </Button>
+
+        <div className="mt-8 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className="w-80 sm:w-96" />
+            <Select value={stockFilter} onValueChange={(v) => setStockFilter(v as any)}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les stocks</SelectItem>
+                <SelectItem value="in">En stock (&gt;5)</SelectItem>
+                <SelectItem value="low">Faible (&le;5)</SelectItem>
+                <SelectItem value="out">Rupture</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as any)}>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                {Object.entries(categoriesMap).map(([id, name]) => (<SelectItem key={id} value={id}>{name}</SelectItem>))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={refresh} title="Rafraîchir">↻</Button>
+            <Button variant="accent" onClick={() => { setDraft(emptyProduct); setOpen(true); }}>
+              <Plus className="h-4 w-4" /> Nouveau produit
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <Table>
-          <TableHeader>
+      <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-card">
+        <Table className="min-w-[900px]">
+          <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
               <TableHead className="w-16"></TableHead>
               <TableHead>Produit</TableHead>
               <TableHead>Catégorie</TableHead>
               <TableHead>
-                <button type="button" className="flex items-center gap-2" onClick={() => setPriceSort(priceSort === "asc" ? "desc" : "asc")}>
+                <button type="button" className="flex items-center gap-2" onClick={() => setPriceSort(priceSort === "asc" ? "desc" : "asc") }>
                   Prix
                   {priceSort === "asc" ? "▲" : priceSort === "desc" ? "▼" : null}
                 </button>
@@ -348,8 +498,8 @@ function AdminProducts() {
                 <TableRow key={p.id}>
                   <TableCell>
                     <Avatar>
-                      {p.images[0]?.url ? (
-                        <AvatarImage src={p.images[0].url} alt={p.name} />
+                      {mainImage(p.images)?.url ? (
+                        <AvatarImage src={mainImage(p.images)!.url} alt={p.name} />
                       ) : (
                         <AvatarFallback>{p.name.slice(0, 1)}</AvatarFallback>
                       )}
@@ -403,8 +553,8 @@ function AdminProducts() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-3">
-              {(viewProduct?.images ?? []).map((img) => (
-                <Avatar key={img.id}>
+              {[...(viewProduct?.images ?? [])].sort((a, b) => Number(b.is_main) - Number(a.is_main) || a.position - b.position).map((img) => (
+                <Avatar key={img.id} className={img.is_main ? "ring-2 ring-accent-strong" : undefined}>
                   <AvatarImage src={img.url} alt={viewProduct?.name} />
                 </Avatar>
               ))}
@@ -417,12 +567,19 @@ function AdminProducts() {
               <div className="mt-4">
                 <h4 className="text-sm font-bold">Variantes</h4>
                 <div className="mt-2 space-y-2">
-                  {viewProduct.variants.map((v) => (
+                  {[...viewProduct.variants].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)).map((v) => (
                     <div key={v.id} className="flex items-center justify-between rounded-md border border-border p-2">
                       <div className="text-xs">
                         <div className="font-medium">{v.sku || "—"}</div>
                         <div className="text-muted-foreground">
-                          {Object.entries(v.options || {}).map(([code, val]) => `${code}: ${val}`).join(" / ") || "—"}
+                          {Object.entries(v.options || {})
+                            .map(([attrId, valId]) => {
+                              const attr = viewProduct.attributes.find((a) => a.id === attrId);
+                              const val = attr?.values.find((x) => x.id === valId);
+                              return attr && val ? `${attr.name}: ${val.label}` : null;
+                            })
+                            .filter(Boolean)
+                            .join(" / ") || "—"}
                         </div>
                       </div>
                       <div className="text-right">
@@ -504,293 +661,27 @@ function AdminProducts() {
               <TabsTrigger value="variantes">Variantes</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="general" className="grid gap-4 pt-5 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Nom</Label>
-                <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Marque</Label>
-                <Input value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
-              </div>
-                <div className="space-y-2">
-                <Label>Catégorie</Label>
-                <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {Object.entries(categoriesMap).map(([id, name]) => (
-                      <SelectItem key={id} value={id}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Prix (DT)</Label>
-                <Input type="number" value={draft.price} onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Prix barré (DT)</Label>
-                <Input
-                  type="number"
-                  value={draft.compare_at_price ?? ""}
-                  onChange={(e) => setDraft({ ...draft, compare_at_price: e.target.value ? Number(e.target.value) : null })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Stock</Label>
-                <Input type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Slug</Label>
-                <Input value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} placeholder="auto" />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Description courte</Label>
-                <Input value={draft.short_description} onChange={(e) => setDraft({ ...draft, short_description: e.target.value })} />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Description</Label>
-                <Textarea rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
-                <Label className="font-normal">Produit actif</Label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Switch checked={draft.is_new} onCheckedChange={(v) => setDraft({ ...draft, is_new: v })} />
-                <Label className="font-normal">Badge « Nouveau »</Label>
-              </div>
+            <TabsContent value="general">
+              <ProductGeneral draft={draft} setDraft={(p) => setDraft(p)} categoriesMap={categoriesMap} />
             </TabsContent>
 
-            <TabsContent value="images" className="pt-5">
-              <div className="flex flex-wrap gap-3">
-                {draft.images.map((img) => (
-                  <div key={img.id} className="relative">
-                    <img src={img.url} alt="" className="h-24 w-24 rounded-lg border border-border object-cover" />
-                    <button
-                      aria-label="Supprimer l'image"
-                      className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full bg-card shadow-card"
-                      onClick={async () => {
-                        if (!draft.id) {
-                          setDraft({ ...draft, images: draft.images.filter((i) => i.id !== img.id) });
-                          return;
-                        }
-                        try {
-                          await supabase.from("product_images").delete().eq("id", img.id);
-                          setDraft({ ...draft, images: draft.images.filter((i) => i.id !== img.id) });
-                          toast.success("Image supprimée.");
-                        } catch (e) {
-                          console.error(e);
-                          toast.error("Impossible de supprimer l'image.");
-                        }
-                      }}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                    {img.variant_value && (
-                      <span className="mt-1 block max-w-24 truncate text-[10px] text-muted-foreground">
-                        {img.variant_value}
-                      </span>
-                    )}
-                  </div>
-                ))}
-
-                <label className="grid h-24 w-24 place-items-center rounded-lg border-2 border-dashed border-border text-muted-foreground hover:border-accent-strong hover:text-accent-strong cursor-pointer">
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        try {
-                          // Ensure product exists first and capture its id immediately
-                          let productId = draft.id;
-                          if (!productId) {
-                            const { data, error } = await supabase.from("products").insert({
-                              name: draft.name || "Untitled",
-                              slug: draft.slug || `prod-${Date.now()}`,
-                              base_price: draft.price || 0,
-                            }).select().single();
-                            if (error) throw error;
-                            productId = data.id;
-                            setDraft((d) => ({ ...d, id: productId }));
-                          }
-
-                          // sanitize filename: keep letters, numbers, dash, underscore and dot
-                          const rawName = file.name.replace(/\s+/g, "_");
-                          const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, "");
-
-                          // Use productId as first path segment (don't repeat the bucket name)
-                          const path = `${productId}/${Date.now()}-${safeName}`;
-                          const publicUrl = await uploadToBucket("products", path, file);
-
-                          const { error } = await supabase.from("product_images").insert({ product_id: productId, url: publicUrl }).select();
-                          if (error) throw error;
-
-                          // refresh images
-                          const { data: refreshed } = await supabase.from("product_images").select("*").eq("product_id", productId).order("position");
-                          setDraft((d) => ({ ...d, images: (refreshed ?? []).map((img: any) => ({ id: img.id, product_id: img.product_id, url: img.url, alt: "", position: img.position ?? 0, variant_value: null })) }));
-                          toast.success("Image uploadée.");
-                        } catch (err) {
-                          console.error(err);
-                          const msg = (err as any)?.message ?? String(err);
-                          if (msg.includes("violates row-level security") || msg.includes("row-level security")) {
-                            toast.error("Upload refusé par les policies RLS — vérifiez que l'utilisateur est admin ou ajustez les policies DB.");
-                          } else {
-                            toast.error("Échec de l'upload.");
-                          }
-                        }
-                      }}
-                  />
-                  <ImagePlus className="h-6 w-6" />
-                </label>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Rattachez une image à une valeur d'attribut (couleur) pour que la galerie change avec la variante.
-              </p>
+            <TabsContent value="images">
+              <ProductImages draft={draft} setDraft={(p) => setDraft(p)} />
             </TabsContent>
 
-            <TabsContent value="variantes" className="space-y-6 pt-5">
-              <section>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wide">Attributs</h3>
-                  <Button size="sm" variant="outline" onClick={addAttribute}>
-                    <Plus className="h-4 w-4" /> Attribut
-                  </Button>
-                </div>
-                {draft.attributes.length === 0 ? (
-                  <p className="mt-3 rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                    Aucun attribut. Ajoutez « Couleur » ou « Taille » pour créer des variantes.
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-4">
-                    {draft.attributes.map((attr) => (
-                      <div key={attr.id} className="rounded-lg border border-border p-4">
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Nom</Label>
-                            <Input value={attr.name} onChange={(e) => updateAttribute(attr.id, { name: e.target.value })} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Code</Label>
-                            <Input value={attr.code} onChange={(e) => updateAttribute(attr.id, { code: e.target.value })} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Affichage</Label>
-                            <Select value={attr.type} onValueChange={(v) => updateAttribute(attr.id, { type: v as ProductAttribute["type"] })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="swatch">Pastille couleur</SelectItem>
-                                <SelectItem value="button">Bouton</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 space-y-2">
-                          {attr.values.map((val) => (
-                            <div key={val.id} className="flex items-center gap-2">
-                              <Input
-                                className="flex-1"
-                                value={val.label}
-                                onChange={(e) =>
-                                  updateAttribute(attr.id, {
-                                    values: attr.values.map((v) => (v.id === val.id ? { ...v, label: e.target.value } : v)),
-                                  })
-                                }
-                              />
-                              {attr.type === "swatch" && (
-                                <input
-                                  type="color"
-                                  aria-label="Couleur"
-                                  value={val.hex ?? "#cccccc"}
-                                  onChange={(e) =>
-                                    updateAttribute(attr.id, {
-                                      values: attr.values.map((v) => (v.id === val.id ? { ...v, hex: e.target.value } : v)),
-                                    })
-                                  }
-                                  className="h-9 w-12 cursor-pointer rounded border border-border bg-card"
-                                />
-                              )}
-                              <button
-                                aria-label="Supprimer la valeur"
-                                className="rounded p-2 text-muted-foreground hover:text-destructive"
-                                onClick={() => updateAttribute(attr.id, { values: attr.values.filter((v) => v.id !== val.id) })}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                          <Button size="sm" variant="ghost" onClick={() => addValue(attr.id)}>
-                            <Plus className="h-4 w-4" /> Ajouter une valeur
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wide">Variantes</h3>
-                  <Button size="sm" variant="outline" onClick={addVariant}>
-                    <Plus className="h-4 w-4" /> Variante
-                  </Button>
-                </div>
-                {draft.variants.length === 0 ? (
-                  <p className="mt-3 rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                    Aucune variante — le produit sera vendu en version unique.
-                  </p>
-                ) : (
-                  <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>SKU</TableHead>
-                          <TableHead>Options</TableHead>
-                          <TableHead className="w-28">Prix</TableHead>
-                          <TableHead className="w-24">Stock</TableHead>
-                          <TableHead className="w-12"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {draft.variants.map((v) => (
-                          <TableRow key={v.id}>
-                            <TableCell>
-                              <Input value={v.sku} onChange={(e) => updateVariant(v.id, { sku: e.target.value })} />
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {Object.entries(v.options)
-                                .map(([code, valueId]) => {
-                                  const attr = draft.attributes.find((a) => a.code === code);
-                                  return attr?.values.find((x) => x.id === valueId)?.label ?? valueId;
-                                })
-                                .join(" / ") || "—"}
-                            </TableCell>
-                            <TableCell>
-                              <Input type="number" value={v.price} onChange={(e) => updateVariant(v.id, { price: Number(e.target.value) })} />
-                            </TableCell>
-                            <TableCell>
-                              <Input type="number" value={v.stock} onChange={(e) => updateVariant(v.id, { stock: Number(e.target.value) })} />
-                            </TableCell>
-                            <TableCell>
-                              <button
-                                aria-label="Supprimer la variante"
-                                className="rounded p-1.5 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDraft({ ...draft, variants: draft.variants.filter((x) => x.id !== v.id) })}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </section>
+            <TabsContent value="variantes">
+              <AttributesVariants
+                draft={draft}
+                setDraft={(p) => setDraft(p)}
+                addAttribute={addAttribute}
+                addValue={addValue}
+                addVariant={addVariant}
+                updateAttribute={updateAttribute}
+                removeAttribute={removeAttribute}
+                updateVariant={updateVariant}
+                setVariantOption={setVariantOption}
+                moveVariant={moveVariant}
+              />
             </TabsContent>
           </Tabs>
 

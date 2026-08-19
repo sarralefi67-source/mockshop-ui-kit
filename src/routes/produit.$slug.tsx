@@ -1,13 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, Heart, Minus, Plus, ShieldCheck, ShoppingCart, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { ProductCard } from "@/components/store/ProductCard";
 import { Stars } from "@/components/store/Stars";
 import { getProductBySlug, products } from "@/data/products";
-import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
+import { reviewsForProduct } from "@/data/reviews";
 import { categoryPath } from "@/data/categories";
 import { formatPrice } from "@/lib/placeholder";
 import { useStore } from "@/context/StoreContext";
@@ -55,15 +54,7 @@ function ProductPage() {
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
 
-  const colorSelection = selection["color"];
-
-  const gallery = useMemo(() => {
-    if (colorSelection) {
-      const filtered = product.images.filter((i) => i.variant_value === colorSelection);
-      if (filtered.length > 0) return filtered;
-    }
-    return product.images;
-  }, [product.images, colorSelection]);
+  const gallery = product.images;
 
   const variant = useMemo(() => {
     if (product.variants.length === 0) return null;
@@ -85,28 +76,7 @@ function ProductPage() {
     .join(" / ");
 
   const path = categoryPath(product.category_id);
-  const { profile } = useAuth();
-  const [productReviews, setProductReviews] = useState<any[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      setLoadingReviews(true);
-      const { data, error } = await supabase.from("reviews").select("*").eq("product_id", product.id).eq("is_approved", true).order("created_at", { ascending: false });
-      if (error) {
-        console.error("load reviews error:", error);
-        setProductReviews([]);
-        setLoadingReviews(false);
-        return;
-      }
-      if (!mounted) return;
-      setProductReviews(data ?? []);
-      setLoadingReviews(false);
-    }
-    load();
-    return () => { mounted = false; };
-  }, [product.id]);
+  const productReviews = reviewsForProduct(product.id);
   const related = products
     .filter((p) => p.id !== product.id && p.category_id.startsWith(path[0]?.id ?? ""))
     .slice(0, 4);
@@ -327,56 +297,6 @@ function ProductPage() {
             <p>{product.description}</p>
           </TabsContent>
 
-        {/* Add review form for authenticated users */}
-        {profile && (
-          <div className="max-w-3xl pt-6">
-            <h3 className="text-lg font-semibold">Laisser un avis</h3>
-            <form className="mt-4 space-y-3" onSubmit={async (e) => {
-              e.preventDefault();
-              const form = e.currentTarget as HTMLFormElement & { rating: any; title: any; body: any };
-              const rating = Number((form.rating as HTMLInputElement).value) || 5;
-              const title = (form.title as HTMLInputElement).value || "";
-              const body = (form.body as HTMLTextAreaElement).value || "";
-              try {
-                const { error } = await supabase.from('reviews').insert({
-                  product_id: product.id,
-                  author: profile.first_name ? `${profile.first_name} ${profile.last_name ?? ''}`.trim() : profile.email,
-                  rating,
-                  title,
-                  body,
-                  is_approved: false,
-                });
-                if (error) throw error;
-                toast.success('Merci — votre avis est transmis pour modération.');
-                form.reset();
-              } catch (err) {
-                console.error('submit review error:', err);
-                toast.error("Impossible d'envoyer l'avis.");
-              }
-            }}>
-              <div className="grid gap-2 sm:grid-cols-6">
-                <div className="sm:col-span-1">
-                  <label className="text-sm">Note</label>
-                  <select name="rating" defaultValue="5" className="mt-1 w-full rounded-md border border-border p-2">
-                    {[5,4,3,2,1].map((n) => <option key={n} value={n}>{n} étoiles</option>)}
-                  </select>
-                </div>
-                <div className="sm:col-span-5">
-                  <label className="text-sm">Titre</label>
-                  <input name="title" className="mt-1 w-full rounded-md border border-border p-2" />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm">Commentaire</label>
-                <textarea name="body" rows={4} className="mt-1 w-full rounded-md border border-border p-2" />
-              </div>
-              <div>
-                <button className="inline-flex items-center rounded-md bg-accent-strong px-4 py-2 text-sm font-medium text-accent-strong-foreground">Envoyer</button>
-              </div>
-            </form>
-          </div>
-        )}
-
           <TabsContent value="specs" className="max-w-3xl pt-6">
             <dl className="divide-y divide-border rounded-lg border border-border">
               {[
@@ -396,9 +316,7 @@ function ProductPage() {
           </TabsContent>
 
           <TabsContent value="avis" className="max-w-3xl pt-6">
-            {loadingReviews ? (
-              <div className="rounded-xl border border-dashed border-border py-16 text-center">Chargement…</div>
-            ) : productReviews.length === 0 ? (
+            {productReviews.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border py-16 text-center">
                 <p className="font-semibold">Aucun avis pour ce produit</p>
                 <p className="mt-1 text-sm text-muted-foreground">Soyez le premier à donner votre avis.</p>

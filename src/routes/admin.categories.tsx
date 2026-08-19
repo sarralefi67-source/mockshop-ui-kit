@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import React, { useEffect, useState, Fragment } from "react";
+import { Pencil, Plus, Trash2, Eye, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 // categories seed removed — use live data from Supabase
 import type { Category } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -41,6 +42,15 @@ function AdminCategories() {
   const [loading, setLoading] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
+  const [viewCategory, setViewCategory] = useState<Category | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedMap((s) => ({ ...s, [id]: !s[id] }));
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -76,6 +86,147 @@ function AdminCategories() {
   }, []);
 
   const filtered = list.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+  const topLevel = filtered.filter((c) => !c.parent_id);
+
+  const renderRow = (c: Category, level = 0) => {
+    const children = filtered.filter((x) => x.parent_id === c.id);
+    const isExpanded = !!expandedMap[c.id];
+    return (
+      <>
+        <TableRow
+          key={c.id}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", c.id);
+            setDragId(c.id);
+          }}
+          onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+          onDragOver={(e) => { e.preventDefault(); setDragOverId(c.id); }}
+          onDragLeave={() => { setDragOverId((s) => (s === c.id ? null : s)); }}
+          onDrop={async (e) => {
+            e.preventDefault();
+            const dragged = e.dataTransfer.getData("text/plain") || dragId;
+            if (!dragged || dragged === c.id) return;
+            try {
+              setLoading(true);
+              // move dragged category to become a child of target `c`
+              const { error: upErr } = await supabase.from("categories").update({ parent_id: c.id }).eq("id", dragged);
+              if (upErr) throw upErr;
+              // recompute positions for new parent's children
+              const { data: siblings } = await supabase.from("categories").select("id").eq("parent_id", c.id).order("position", { ascending: true });
+              if (siblings) {
+                for (let i = 0; i < (siblings as any).length; i++) {
+                  const id = (siblings as any)[i].id;
+                  await supabase.from("categories").update({ position: i + 1 }).eq("id", id);
+                }
+              }
+              // recompute positions for old parent (best-effort)
+              const { data: all } = await supabase.from("categories").select("*").order("position", { ascending: true });
+              if (all) {
+                const normalized: Category[] = (all ?? []).map((r: any) => ({
+                  id: r.id,
+                  parent_id: r.parent_id ?? null,
+                  name: r.name,
+                  slug: r.slug,
+                  description: r.description ?? null,
+                  position: r.position ?? 1,
+                  is_active: typeof r.is_active === "boolean" ? r.is_active : true,
+                  image_url: r.image_url ?? null,
+                  created_at: r.created_at ?? undefined,
+                }));
+                setList(normalized);
+              }
+              toast.success("Catégorie déplacée.");
+            } catch (err) {
+              console.error("drop move error:", err);
+              toast.error("Impossible de déplacer la catégorie.");
+            } finally {
+              setLoading(false);
+              setDragId(null);
+              setDragOverId(null);
+            }
+          }}
+          className={dragOverId === c.id ? 'bg-accent/5' : undefined}
+        >
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              {children.length > 0 ? (
+                <button type="button" aria-label="Toggle" className="p-1" onClick={() => toggleExpanded(c.id)}>
+                  {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+              ) : <span className="w-4" />}
+              <span style={{ paddingLeft: level * 12 }}>{c.name}</span>
+            </div>
+          </TableCell>
+          <TableCell className="text-muted-foreground">{c.slug}</TableCell>
+          <TableCell className="text-muted-foreground">{list.find((p) => p.id === c.parent_id)?.name ?? "—"}</TableCell>
+          <TableCell>{c.position}</TableCell>
+          <TableCell>
+            <span className={c.is_active ? "text-sm font-medium text-success" : "text-sm text-muted-foreground"}>
+              {c.is_active ? "Active" : "Inactive"}
+            </span>
+          </TableCell>
+          <TableCell className="text-right">
+            <button aria-label="Modifier" className="mr-1 rounded p-1.5 text-muted-foreground hover:bg-surface" onClick={() => { setDraft(c); setFile(null); setImgError(null); setOpen(true); }}>
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button aria-label="Voir" className="mr-1 rounded p-1.5 text-muted-foreground hover:bg-surface" onClick={() => setViewCategory(c)}>
+              <Eye className="h-4 w-4" />
+            </button>
+            <button aria-label="Supprimer" className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-destructive" onClick={() => setConfirmDeleteId(c.id)}>
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </TableCell>
+        </TableRow>
+        {isExpanded && children.map((ch) => (
+          <Fragment key={ch.id}>{renderRow(ch, level + 1)}</Fragment>
+        ))}
+      </>
+    );
+  };
+
+  // Drop zone to move a category to top-level
+  const onDropToRoot = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const dragged = e.dataTransfer.getData("text/plain") || dragId;
+    if (!dragged) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from("categories").update({ parent_id: null }).eq("id", dragged);
+      if (error) throw error;
+      // recompute positions for top-level
+      const { data: tops } = await supabase.from("categories").select("id").is("parent_id", null).order("position", { ascending: true });
+      if (tops) {
+        for (let i = 0; i < (tops as any).length; i++) {
+          const id = (tops as any)[i].id;
+          await supabase.from("categories").update({ position: i + 1 }).eq("id", id);
+        }
+      }
+      const { data: all } = await supabase.from("categories").select("*").order("position", { ascending: true });
+      if (all) {
+        const normalized: Category[] = (all ?? []).map((r: any) => ({
+          id: r.id,
+          parent_id: r.parent_id ?? null,
+          name: r.name,
+          slug: r.slug,
+          description: r.description ?? null,
+          position: r.position ?? 1,
+          is_active: typeof r.is_active === "boolean" ? r.is_active : true,
+          image_url: r.image_url ?? null,
+          created_at: r.created_at ?? undefined,
+        }));
+        setList(normalized);
+      }
+      toast.success("Catégorie déplacée en niveau supérieur.");
+    } catch (err) {
+      console.error("drop to root error:", err);
+      toast.error("Impossible de déplacer la catégorie.");
+    } finally {
+      setLoading(false);
+      setDragId(null);
+      setDragOverId(null);
+    }
+  };
 
   const validateAndSetFile = (f: File | null) => {
     setImgError(null);
@@ -208,23 +359,39 @@ function AdminCategories() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-4">
+      <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-bold">Catégories</h1>
           <p className="text-sm text-muted-foreground">{list.length} catégories sur 3 niveaux.</p>
         </div>
-        <div className="flex gap-2">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher…"
-            className="w-48"
-          />
-          <Button variant="accent" onClick={() => { setDraft(empty); setFile(null); setImgError(null); setOpen(true); }}>
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher…"
+              className="w-full sm:w-72"
+            />
+          </div>
+
+          <Button
+            variant="accent"
+            onClick={() => { setDraft(empty); setFile(null); setImgError(null); setOpen(true); }}
+            className="ml-auto"
+          >
             <Plus className="h-4 w-4" /> Nouvelle catégorie
           </Button>
         </div>
+      </div>
+
+      <div
+        className={`mb-3 rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground ${dragId ? 'bg-accent/5 border-accent' : ''}`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={onDropToRoot}
+      >
+        Glisser-déposer ici pour déplacer en niveau supérieur
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -247,55 +414,81 @@ function AdminCategories() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-medium">{c.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.slug}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {list.find((p) => p.id === c.parent_id)?.name ?? "—"}
-                  </TableCell>
-                  <TableCell>{c.position}</TableCell>
-                  <TableCell>
-                    <span className={c.is_active ? "text-sm font-medium text-success" : "text-sm text-muted-foreground"}>
-                      {c.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <button
-                      aria-label="Modifier"
-                      className="mr-1 rounded p-1.5 text-muted-foreground hover:bg-surface"
-                      onClick={() => { setDraft(c); setFile(null); setImgError(null); setOpen(true); }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      aria-label="Supprimer"
-                      className="rounded p-1.5 text-muted-foreground hover:bg-surface hover:text-destructive"
-                      onClick={async () => {
-                        if (!profile) {
-                          toast.error("Action non autorisée.");
-                          return;
-                        }
-                        try {
-                          const { error } = await supabase.from("categories").delete().eq("id", c.id);
-                          if (error) throw error;
-                          setList((p) => p.filter((x) => x.id !== c.id));
-                          toast.success("Catégorie supprimée.");
-                        } catch (err) {
-                          console.error("delete category error:", err);
-                          toast.error("Impossible de supprimer la catégorie.");
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))
+              topLevel.map((c) => renderRow(c))
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* View category dialog */}
+      <Dialog open={Boolean(viewCategory)} onOpenChange={(v) => { if (!v) setViewCategory(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{viewCategory ? viewCategory.name : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              {viewCategory?.image_url ? (
+                <Avatar>
+                  <AvatarImage src={viewCategory.image_url} alt={viewCategory.name} />
+                </Avatar>
+              ) : (
+                <Avatar>
+                  <AvatarFallback>{viewCategory?.name.slice(0, 1)}</AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">{viewCategory?.description}</p>
+            <p className="text-sm">Parent: {list.find((p) => p.id === viewCategory?.parent_id)?.name ?? "—"}</p>
+            <p className="text-sm">Position: {viewCategory?.position}</p>
+            <p className={viewCategory?.is_active ? "text-sm font-medium text-success" : "text-sm text-muted-foreground"}>{viewCategory?.is_active ? "Active" : "Inactive"}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setViewCategory(null)}>Fermer</Button>
+              <Button variant="accent" onClick={() => { if (viewCategory) { setDraft(viewCategory); setOpen(true); setViewCategory(null); } }}>Éditer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm delete dialog for categories */}
+      <Dialog open={Boolean(confirmDeleteId)} onOpenChange={(v) => { if (!v) setConfirmDeleteId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+          </DialogHeader>
+          <p>Voulez-vous vraiment supprimer cette catégorie ?</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Annuler</Button>
+            <Button variant="accent" className="bg-destructive hover:bg-destructive/90" onClick={async () => {
+              const id = confirmDeleteId;
+              if (!id) return;
+              try {
+                // fetch category to get image url
+                const { data: catData, error: catErr } = await supabase.from("categories").select("image_url").eq("id", id).maybeSingle();
+                if (catErr) throw catErr;
+                const imageUrl = (catData as any)?.image_url as string | undefined;
+                if (imageUrl) {
+                  const m = imageUrl.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+                  if (m) {
+                    const bucket = m[1]!;
+                    const path = decodeURIComponent(m[2]!);
+                    try { await deleteFromBucket(bucket, path); } catch (e) { console.warn("failed to delete category image", e); }
+                  }
+                }
+                const { error } = await supabase.from("categories").delete().eq("id", id);
+                if (error) throw error;
+                setList((p) => p.filter((x) => x.id !== id));
+                toast.success("Catégorie supprimée.");
+              } catch (err) {
+                console.error("delete category error:", err);
+                toast.error("Impossible de supprimer la catégorie.");
+              } finally {
+                setConfirmDeleteId(null);
+              }
+            }}>Supprimer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

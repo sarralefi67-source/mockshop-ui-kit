@@ -306,5 +306,66 @@ create policy "admin full access products" on products
     exists (select 1 from profiles where id = auth.uid() and role = 'admin')
   );
 
+-- ---------------------------------------------------------
+-- AUTO-GENERATED FIELDS: SKU / ORDER NUMBER
+-- These helpers generate server-side values so the frontend doesn't
+-- have to synthesize or display internal-only fields.
+-- ---------------------------------------------------------
+
+-- sequence for human-friendly order numbers
+create sequence if not exists order_number_seq start 1000;
+
+create function generate_order_number() returns text language sql stable as $$
+  select 'ORD-' || nextval('order_number_seq')::text;
+$$;
+
+create function products_set_defaults() returns trigger as $$
+begin
+  if new.sku is null or new.sku = '' then
+    new.sku := concat('P-', substr(md5(gen_random_uuid()::text), 1, 8));
+  end if;
+  if new.created_at is null then
+    new.created_at := now();
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create function variants_set_defaults() returns trigger as $$
+begin
+  if new.sku is null or new.sku = '' then
+    new.sku := concat('V-', substr(md5(gen_random_uuid()::text), 1, 8));
+  end if;
+  if new.created_at is null then
+    new.created_at := now();
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+-- attach triggers
+drop trigger if exists trg_products_defaults on products;
+create trigger trg_products_defaults before insert on products
+  for each row execute procedure products_set_defaults();
+
+drop trigger if exists trg_variants_defaults on product_variants;
+create trigger trg_variants_defaults before insert on product_variants
+  for each row execute procedure variants_set_defaults();
+
+-- order number trigger
+drop trigger if exists trg_orders_number on orders;
+create trigger trg_orders_number before insert on orders
+  for each row execute procedure (
+    begin
+      if new.order_number is null or new.order_number = '' then
+        new.order_number := generate_order_number();
+      end if;
+      if new.created_at is null then
+        new.created_at := now();
+      end if;
+      return new;
+    end;
+  );
+
 -- NOTE: à dupliquer/adapter pour attributes, attribute_values, product_variants (write),
 -- promotions, coupons, order_items, addresses, carts, cart_items etc.

@@ -6,13 +6,14 @@ import { useAuth } from "@/context/AuthContext";
 import { buildCategoryTree } from "@/data/categories";
 import { searchProducts } from "@/data/products";
 import { formatPrice } from "@/lib/placeholder";
+import type { CategoryNode } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MegaMenu } from "./MegaMenu";
 
-const tree = buildCategoryTree();
+const tree: CategoryNode[] = buildCategoryTree();
 
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
@@ -99,7 +100,12 @@ export function Header() {
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="hidden sm:block text-sm font-medium">{profile?.first_name ?? user.email}</span>
-                <Button variant="ghost" size="icon" onClick={async () => { await signOut(); }} aria-label="Se déconnecter">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate({ to: profile?.role === "admin" ? "/admin/parametres" : "/compte" })}
+                  aria-label={profile?.role === "admin" ? "Paramètres" : "Mon compte"}
+                >
                   <User className="h-5 w-5" />
                 </Button>
               </div>
@@ -182,51 +188,63 @@ export function Header() {
           </SheetHeader>
           <div className="overflow-y-auto px-3 py-2">
             <Accordion type="multiple">
-              {tree.map((cat) => (
-                <AccordionItem key={cat.id} value={cat.id}>
-                  <AccordionTrigger className="text-sm font-semibold">{cat.name}</AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="space-y-1 pl-2">
-                      <li>
-                        <Link
-                          to="/categorie/$slug"
-                          params={{ slug: cat.slug }}
-                          onClick={() => setMobileOpen(false)}
-                          className="block py-1 text-sm font-medium text-accent-strong"
-                        >
-                          Tout {cat.name}
-                        </Link>
-                      </li>
-                      {cat.children.map((sub) => (
-                        <li key={sub.id}>
+              {tree.map((cat: CategoryNode) => {
+                const subCategories: CategoryNode[] = cat.children ?? [];
+
+                return (
+                  <AccordionItem key={cat.id} value={cat.id}>
+                    <AccordionTrigger className="text-sm font-semibold">{cat.name}</AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="space-y-1 pl-2">
+                        <li>
                           <Link
                             to="/categorie/$slug"
-                            params={{ slug: sub.slug }}
+                            params={{ slug: cat.slug }}
                             onClick={() => setMobileOpen(false)}
-                            className="block py-1 text-sm"
+                            className="block py-1 text-sm font-medium text-accent-strong"
                           >
-                            {sub.name}
+                            Tout {cat.name}
                           </Link>
-                          <ul className="pl-3">
-                            {sub.children.map((leaf) => (
-                              <li key={leaf.id}>
-                                <Link
-                                  to="/categorie/$slug"
-                                  params={{ slug: leaf.slug }}
-                                  onClick={() => setMobileOpen(false)}
-                                  className="block py-1 text-sm text-muted-foreground"
-                                >
-                                  {leaf.name}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
                         </li>
-                      ))}
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
+                        {subCategories.map((sub) => {
+                          const typedSub = sub as CategoryNode;
+                          const leafCategories: CategoryNode[] = typedSub.children ?? [];
+
+                          return (
+                            <li key={typedSub.id}>
+                              <Link
+                                to="/categorie/$slug"
+                                params={{ slug: typedSub.slug }}
+                                onClick={() => setMobileOpen(false)}
+                                className="block py-1 text-sm"
+                              >
+                                {typedSub.name}
+                              </Link>
+                              <ul className="pl-3">
+                                {leafCategories.map((leaf) => {
+                                  const typedLeaf = leaf as CategoryNode;
+                                  return (
+                                    <li key={typedLeaf.id}>
+                                      <Link
+                                        to="/categorie/$slug"
+                                        params={{ slug: typedLeaf.slug }}
+                                        onClick={() => setMobileOpen(false)}
+                                        className="block py-1 text-sm text-muted-foreground"
+                                      >
+                                        {typedLeaf.name}
+                                      </Link>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
             <div className="mt-4 space-y-1 border-t border-border pt-4">
               <Link to="/promotions" onClick={() => setMobileOpen(false)} className="block py-1.5 text-sm font-semibold text-accent-strong">
@@ -235,6 +253,11 @@ export function Header() {
               <Link to="/compte" onClick={() => setMobileOpen(false)} className="block py-1.5 text-sm">
                 Mon compte
               </Link>
+              {profile?.role === "admin" && (
+                <Link to="/admin/parametres" onClick={() => setMobileOpen(false)} className="block py-1.5 text-sm">
+                  Paramètres
+                </Link>
+              )}
               <Link to="/favoris" onClick={() => setMobileOpen(false)} className="block py-1.5 text-sm">
                 Mes favoris
               </Link>

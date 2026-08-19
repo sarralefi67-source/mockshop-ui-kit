@@ -918,6 +918,7 @@ export type ProductImage = {
   url: string
   alt: string
   position: number
+  is_main?: boolean
   variant_value: string | null
 }
 
@@ -933,11 +934,13 @@ export type ProductVariant = {
   id: string
   product_id: string
   sku: string
+  // keyed by the REAL attribute id (attributes.id) -> the chosen attribute_values.id
   options: Record<string, string>
   price: number
   compare_at_price: number | null
   stock: number
   is_active: boolean
+  position?: number
 }
 
 export type Product = {
@@ -963,6 +966,36 @@ export type Product = {
   tags: string[]
 }
 
+export type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+export type OrderItem = {
+  id: string
+  product_id: string | null
+  variant_id: string | null
+  name: string
+  variant_label: string | null
+  image: string
+  unit_price: number
+  quantity: number
+}
+
+export type Order = {
+  id: string
+  order_number?: string
+  reference: string
+  customer_name: string
+  customer_phone: string
+  status: OrderStatus
+  payment_method?: string
+  subtotal: number
+  shipping: number
+  discount: number
+  total: number
+  governorate: string
+  created_at: string | null
+  items: OrderItem[]
+}
+
 export type Category = {
   id: string
   parent_id: string | null
@@ -975,6 +1008,9 @@ export type Category = {
   created_at?: string
 }
 
+export type CategoryNode = Category & {
+  children: CategoryNode[]
+}
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 

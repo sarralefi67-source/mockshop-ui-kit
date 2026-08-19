@@ -106,7 +106,7 @@ function HomePage() {
               <h3 className="text-base font-semibold group-hover:text-accent-strong">{cat.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{cat.description}</p>
               <ul className="mt-3 space-y-1">
-                {cat.children.slice(0, 3).map((s) => (
+                {cat.children.slice(0, 3).map((s: { id: string; name: string }) => (
                   <li key={s.id} className="text-xs text-muted-foreground">— {s.name}</li>
                 ))}
               </ul>
