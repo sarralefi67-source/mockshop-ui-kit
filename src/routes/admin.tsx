@@ -29,11 +29,11 @@ const nav = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/produits", label: "Produits", icon: Package, exact: false },
   { to: "/admin/commandes", label: "Commandes", icon: ShoppingBag, exact: false },
-  { to: "/admin/clients", label: "Clients", icon: User, exact: false },
-  { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
   { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
   { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
+  { to: "/admin/clients", label: "Clients", icon: User, exact: false },
   { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
+  { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
   { to: "/admin/parametres", label: "Paramètres", icon: User, exact: false },
 ] as const;
 
@@ -119,8 +119,10 @@ function AdminLayout() {
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-        
+        <div className="relative flex h-16 items-center gap-2 border-b border-border px-5">
+          <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-lg font-extrabold">
+            E_<span className="text-accent-strong">Commerce</span>
+          </span>
           <button className="ml-auto lg:hidden" onClick={() => setOpen(false)} aria-label="Fermer">
             <ChevronLeft className="h-5 w-5" />
           </button>

@@ -29,12 +29,82 @@ create table categories (
   slug text not null unique,
   description text,
   image_url text,
-  position int default 0,
   is_active boolean default true,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 create index idx_categories_parent on categories(parent_id);
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_categories_updated_at on public.categories;
+create trigger trg_categories_updated_at
+before update on public.categories
+for each row
+execute function public.set_updated_at();
+
+-- Génération automatique de slugs pour les URLs publiques.
+create extension if not exists unaccent;
+
+create or replace function public.generate_category_slug(
+  p_name text,
+  p_category_id uuid default null
+)
+returns text
+language plpgsql
+stable
+as $$
+declare
+  base_slug text;
+  candidate text;
+  suffix integer := 2;
+begin
+  base_slug := lower(regexp_replace(unaccent(coalesce(p_name, '')), '[^a-zA-Z0-9]+', '-', 'g'));
+  base_slug := regexp_replace(base_slug, '(^-|-$)', '', 'g');
+
+  if base_slug = '' then
+    base_slug := 'categorie';
+  end if;
+
+  candidate := base_slug;
+  while exists (
+    select 1
+      from public.categories
+     where slug = candidate
+       and (p_category_id is null or id <> p_category_id)
+  ) loop
+    candidate := base_slug || '-' || suffix;
+    suffix := suffix + 1;
+  end loop;
+
+  return candidate;
+end;
+$$;
+
+create or replace function public.set_category_slug()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.slug := public.generate_category_slug(new.name, new.id);
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_categories_set_slug on public.categories;
+create trigger trg_categories_set_slug
+before insert or update of name on public.categories
+for each row
+execute function public.set_category_slug();
 
 -- ---------------------------------------------------------
 -- 3. PRODUITS
@@ -99,6 +169,7 @@ create table product_variants (
   product_id uuid references products(id) on delete cascade,
   sku text unique,
   price numeric(10,3) not null,
+  cost_price numeric(10,3),               -- prix promotionnel calculé, null si aucune promo
   compare_at_price numeric(10,3),           -- prix barré / solde
   stock_quantity int default 0,
   is_active boolean default true,
@@ -380,7 +451,7 @@ alter table product_variants
 
 -- calcule et stocke la promo pour un produit ou une variante
 create or replace function refresh_promo_for_item(p_product_id uuid, p_variant_id uuid default null)
-returns void language plpgsql stable as $$
+returns void language plpgsql as $$
 declare
   v_price numeric;
   v_id uuid;
@@ -405,7 +476,7 @@ begin
   from promotions
   where is_active = true
     and ( (variant_id is not null and variant_id = p_variant_id)
-       or (variant_id is null and product_id = p_product_id) )
+       or (variant_id is null and (product_id is null or product_id = p_product_id)) )
     and (starts_at is null or starts_at <= now())
     and (ends_at is null or ends_at >= now())
   order by (case when variant_id is not null then 0 else 1 end), discount_value desc
@@ -437,21 +508,49 @@ begin
 end;
 $$;
 
+-- recalcule les prix promotionnels de tout le catalogue pour une promotion globale
+create or replace function refresh_all_promo_items()
+returns void language plpgsql as $$
+declare
+  item record;
+begin
+  for item in select id from products loop
+    perform refresh_promo_for_item(item.id);
+  end loop;
+
+  for item in select id, product_id from product_variants loop
+    perform refresh_promo_for_item(item.product_id, item.id);
+  end loop;
+end;
+$$;
+
 -- trigger pour rafraîchir les champs stockés quand une promotion change
 create or replace function trg_promotions_refresh() returns trigger as $$
 begin
   -- sur insert/update: refresh for NEW target
   if (tg_op = 'INSERT' or tg_op = 'UPDATE') then
-    perform refresh_promo_for_item(NEW.product_id, NEW.variant_id);
+    if NEW.product_id is null then
+      perform refresh_all_promo_items();
+    else
+      perform refresh_promo_for_item(NEW.product_id, NEW.variant_id);
+    end if;
   end if;
 
   -- sur update/delete: aussi rafraîchir pour l'ancienne cible si différente
   if (tg_op = 'UPDATE' or tg_op = 'DELETE') then
     if TG_OP = 'DELETE' then
-      perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+      if OLD.product_id is null then
+        perform refresh_all_promo_items();
+      else
+        perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+      end if;
     elsif TG_OP = 'UPDATE' then
       if OLD.product_id is distinct from NEW.product_id or OLD.variant_id is distinct from NEW.variant_id then
-        perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+        if OLD.product_id is null then
+          perform refresh_all_promo_items();
+        else
+          perform refresh_promo_for_item(OLD.product_id, OLD.variant_id);
+        end if;
       end if;
     end if;
   end if;

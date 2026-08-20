@@ -32,10 +32,10 @@ export function Footer() {
         ))}
       </div>
 
-      <div className="container-page grid gap-8 py-12 md:grid-cols-4">
+      <div className="container-page grid gap-8 py-12 md:grid-cols-3">
         <div>
           <span className="text-lg font-extrabold">
-            Nexa<span className="text-accent-strong">Store</span>
+            E_<span className="text-accent-strong">Commerce</span>
           </span>
           <p className="mt-3 text-sm text-muted-foreground">
             Votre boutique high-tech et maison en Tunisie. Des produits sélectionnés, livrés chez
@@ -48,22 +48,7 @@ export function Footer() {
           </ul>
         </div>
 
-        <div>
-          <h3 className="text-sm font-bold uppercase tracking-wide">Catégories</h3>
-          <ul className="mt-4 space-y-2">
-            {tree.map((c) => (
-              <li key={c.id}>
-                <Link
-                  to="/categorie/$slug"
-                  params={{ slug: c.slug }}
-                  className="text-sm text-muted-foreground hover:text-accent-strong"
-                >
-                  {c.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+     
 
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wide">Informations</h3>

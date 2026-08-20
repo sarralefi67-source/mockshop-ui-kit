@@ -6,6 +6,12 @@ alter table reviews
   foreign key (user_id) references profiles(id) on delete cascade;
 
 alter table profiles add column if not exists email text;
+
+alter table public.reviews
+  alter column is_approved drop not null;
+
+alter table public.reviews
+  alter column is_approved set default null;
 */
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -14,12 +20,22 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { CheckCircle2, Clock3, Eye, Trash2, XCircle } from "lucide-react";
 import SortArrow from "@/components/ui/sort-arrow";
+import Spinner from "@/components/ui/spinner";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export const Route = createFileRoute("/admin/avis")({
   component: AdminAvis,
@@ -42,7 +58,14 @@ export default function AdminAvis() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedReviewIds, setSelectedReviewIds] = useState<string[]>([]);
+  const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [updatingReviewId, setUpdatingReviewId] = useState<string | null>(null);
+  const [updatingStatusAction, setUpdatingStatusAction] = useState<"approve" | "reject" | null>(null);
   const [statusDecision, setStatusDecision] = useState<{ id: string; status: boolean | null | undefined } | null>(null);
+  const [reviewDetails, setReviewDetails] = useState<ReviewRow | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     let mounted = true;
@@ -104,8 +127,37 @@ export default function AdminAvis() {
     return out;
   }, [reviews, query, statusFilter, sortDir]);
 
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const pageReviews = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, visible.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter, sortDir]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const allVisibleSelected = visible.length > 0 && visible.every((review) => selectedReviewIds.includes(review.id));
+
+  const toggleReviewSelection = (id: string, checked: boolean) => {
+    setSelectedReviewIds((prev) => checked ? [...new Set([...prev, id])] : prev.filter((reviewId) => reviewId !== id));
+  };
+
+  const toggleAllVisibleReviews = (checked: boolean) => {
+    if (checked) {
+      setSelectedReviewIds((prev) => [...new Set([...prev, ...visible.map((review) => review.id)])]);
+    } else {
+      const visibleIds = new Set(visible.map((review) => review.id));
+      setSelectedReviewIds((prev) => prev.filter((id) => !visibleIds.has(id)));
+    }
+  };
+
   const toggleApproval = async (id: string, to: boolean) => {
-    setLoading(true);
+    setUpdatingReviewId(id);
     try {
       const { error } = await supabase.from("reviews").update({ is_approved: to }).eq("id", id);
       if (error) throw error;
@@ -115,7 +167,7 @@ export default function AdminAvis() {
       console.error("toggleApproval", err);
       toast.error("Impossible de mettre à jour l'état de l'avis.");
     } finally {
-      setLoading(false);
+      setUpdatingReviewId(null);
     }
   };
 
@@ -137,9 +189,35 @@ export default function AdminAvis() {
     }
   };
 
+  const deleteSelectedReviews = async () => {
+    if (confirmDeleteIds.length === 0) return;
+    setIsBulkDeleting(true);
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("reviews").delete().in("id", confirmDeleteIds);
+      if (error) throw error;
+      const deletedIds = new Set(confirmDeleteIds);
+      setReviews((prev) => prev.filter((review) => !deletedIds.has(review.id)));
+      setSelectedReviewIds((prev) => prev.filter((id) => !deletedIds.has(id)));
+      toast.success(`${confirmDeleteIds.length} avis supprimé${confirmDeleteIds.length > 1 ? "s" : ""}.`);
+    } catch (err) {
+      console.error("delete selected reviews", err);
+      toast.error("Impossible de supprimer les avis sélectionnés.");
+    } finally {
+      setIsBulkDeleting(false);
+      setLoading(false);
+      setConfirmDeleteIds([]);
+    }
+  };
+
   const formatUser = (r: ReviewRow) => {
     const name = [r.profile?.first_name, r.profile?.last_name].filter(Boolean).join(" ");
     return name || r.profile?.email || "-";
+  };
+
+  const truncateComment = (comment: string | null | undefined) => {
+    const words = (comment ?? "").trim().split(/\s+/).filter(Boolean);
+    return words.length > 5 ? `${words.slice(0, 5).join(" ")}...` : words.join(" ");
   };
 
   const openStatusDialog = (id: string, currentStatus: boolean | null | undefined) => {
@@ -148,35 +226,57 @@ export default function AdminAvis() {
 
   const applyStatusDecision = async (nextStatus: boolean) => {
     if (!statusDecision) return;
-    await toggleApproval(statusDecision.id, nextStatus);
-    setStatusDecision(null);
+    setUpdatingStatusAction(nextStatus ? "approve" : "reject");
+    try {
+      await toggleApproval(statusDecision.id, nextStatus);
+      setStatusDecision(null);
+    } finally {
+      setUpdatingStatusAction(null);
+    }
   };
 
   return (
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold">Avis clients</h1>
-          <p className="text-sm text-muted-foreground">Modération des avis — approuver ou rejeter avant publication.</p>
+          <h1 className="text-2xl font-bold">Avis clients ({reviews.length})</h1>
+          <p className="text-sm text-muted-foreground">Modération des avis : approuver ou rejeter avant publication.</p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Input placeholder="Rechercher par SKU produit ou email" value={query} onChange={(e) => setQuery(String(e.target.value))} />
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="approved">Approuvé</SelectItem>
-              <SelectItem value="pending">En attente</SelectItem>
-              <SelectItem value="rejected">Rejeté</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <Input className="w-64 sm:w-80" placeholder="Rechercher par SKU produit ou email" value={query} onChange={(e) => setQuery(String(e.target.value))} />
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                <SelectItem value="approved">Approuvé</SelectItem>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="rejected">Rejeté</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {selectedReviewIds.length > 0 && (
+          <div className="mt-3 mb-3">
+            <Button variant="destructive" onClick={() => setConfirmDeleteIds(selectedReviewIds)} disabled={loading}>
+              <Trash2 className="h-4 w-4" /> Supprimer ({selectedReviewIds.length})
+            </Button>
+          </div>
+        )}
 
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    onCheckedChange={(checked) => toggleAllVisibleReviews(checked === true)}
+                    aria-label="Sélectionner tous les avis visibles"
+                    disabled={loading || visible.length === 0}
+                  />
+                </TableHead>
                 <TableHead>Produit</TableHead>
                 <TableHead>Utilisateur</TableHead>
                 <TableHead>
@@ -196,31 +296,63 @@ export default function AdminAvis() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visible.length === 0 ? (
+              {loading && reviews.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-14 text-center text-muted-foreground">Aucun avis trouvé.</TableCell>
+                  <TableCell colSpan={8} className="py-14 text-center">
+                    <div className="flex justify-center">
+                      <Spinner showLabel label="Chargement des avis..." />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : visible.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="py-14 text-center text-muted-foreground">Aucun avis trouvé.</TableCell>
                 </TableRow>
               ) : (
-                visible.map((r) => (
+                pageReviews.map((r) => (
                   <TableRow key={r.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedReviewIds.includes(r.id)}
+                        onCheckedChange={(checked) => toggleReviewSelection(r.id, checked === true)}
+                        aria-label={`Sélectionner l'avis ${r.id}`}
+                        disabled={loading}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{r.product?.sku ?? r.product?.name ?? "-"}</TableCell>
                     <TableCell className="max-w-xs truncate">{formatUser(r)}</TableCell>
                     <TableCell>{r.rating} / 5</TableCell>
-                    <TableCell className="max-w-xl truncate">{r.comment ?? ""}</TableCell>
+                    <TableCell className="max-w-xl">{truncateComment(r.comment)}</TableCell>
                     <TableCell>{r.created_at ? format(new Date(r.created_at), "Pp") : "-"}</TableCell>
                     <TableCell>
                       <Button
                         size="sm"
-                        variant={r.is_approved === true ? "default" : r.is_approved === false ? "secondary" : "outline"}
-                        className={r.is_approved === true ? "bg-green-600 text-white hover:bg-green-700" : r.is_approved === false ? "bg-red-600 text-white hover:bg-red-700" : ""}
+                        variant="outline"
+                        className={r.is_approved === true
+                          ? "gap-1.5 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
+                          : r.is_approved === false
+                            ? "gap-1.5 border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800"
+                            : "gap-1.5 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800"}
                         onClick={() => openStatusDialog(r.id, r.is_approved)}
-                        disabled={loading}
+                        disabled={loading || updatingReviewId !== null}
                       >
+                        {updatingReviewId === r.id ? (
+                          <Spinner className="h-4 w-4" />
+                        ) : r.is_approved === true ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : r.is_approved === false ? (
+                          <XCircle className="h-4 w-4" />
+                        ) : (
+                          <Clock3 className="h-4 w-4" />
+                        )}
                         {r.is_approved === true ? "Approuvé" : r.is_approved === false ? "Rejeté" : "En attente"}
                       </Button>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setReviewDetails(r)} aria-label="Voir l'avis">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmDeleteId(r.id)} aria-label="Supprimer">
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -232,7 +364,121 @@ export default function AdminAvis() {
             </TableBody>
           </Table>
         </div>
+
+        {visible.length > 0 && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm text-foreground">
+              {pageStart}–{pageEnd} sur {visible.length}
+            </span>
+            <Pagination className="mx-0 w-auto justify-end text-foreground">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    className={currentPage === 1 ? "pointer-events-none opacity-50 text-foreground" : "text-foreground"}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((page) => Math.max(1, page - 1));
+                    }}
+                    aria-disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      isActive={currentPage === page}
+                      className="text-foreground"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setCurrentPage(page);
+                      }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50 text-foreground" : "text-foreground"}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage((page) => Math.min(totalPages, page + 1));
+                    }}
+                    aria-disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </div>
+
+      {/* Review details dialog */}
+      <Dialog open={Boolean(reviewDetails)} onOpenChange={(open) => { if (!open) setReviewDetails(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Détail de l'avis</DialogTitle>
+          </DialogHeader>
+          {reviewDetails && (
+            <div className="space-y-4 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground">Produit</p>
+                  <p className="font-semibold">{reviewDetails.product?.sku ?? reviewDetails.product?.name ?? "-"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Utilisateur</p>
+                  <p className="font-semibold">{formatUser(reviewDetails)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Note</p>
+                  <p className="font-semibold">{reviewDetails.rating} / 5</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Statut</p>
+                  <span className={reviewDetails.is_approved === true
+                    ? "mt-1 inline-flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
+                    : reviewDetails.is_approved === false
+                      ? "mt-1 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
+                      : "mt-1 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"}
+                  >
+                    {reviewDetails.is_approved === true ? <CheckCircle2 className="h-4 w-4" /> : reviewDetails.is_approved === false ? <XCircle className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
+                    {reviewDetails.is_approved === true ? "Approuvé" : reviewDetails.is_approved === false ? "Rejeté" : "En attente"}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Commentaire</p>
+                <p className="mt-1 whitespace-pre-wrap rounded-md border border-border bg-muted/30 p-3">
+                  {reviewDetails.comment || "Aucun commentaire"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Date</p>
+                <p className="font-semibold">{reviewDetails.created_at ? format(new Date(reviewDetails.created_at), "Pp") : "-"}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk delete dialog */}
+      <Dialog open={confirmDeleteIds.length > 0} onOpenChange={(open) => { if (!open && !isBulkDeleting) setConfirmDeleteIds([]); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer les avis sélectionnés ?</DialogTitle>
+          </DialogHeader>
+          <p>Voulez-vous vraiment supprimer {confirmDeleteIds.length} avis ? Cette action est irréversible.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteIds([])} disabled={isBulkDeleting}>Annuler</Button>
+            <Button variant="destructive" onClick={deleteSelectedReviews} disabled={isBulkDeleting}>
+              {isBulkDeleting ? <Spinner className="h-4 w-4" /> : <><Trash2 className="h-4 w-4" /> Supprimer</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Status decision dialog */}
       <Dialog open={Boolean(statusDecision)} onOpenChange={(v) => { if (!v) setStatusDecision(null); }}>
@@ -242,8 +488,12 @@ export default function AdminAvis() {
           </DialogHeader>
           <p>Vous voullez publier cet avis ?</p>
           <DialogFooter className="gap-2 sm:justify-end">
-            <Button variant="secondary" className="bg-red-600 text-white hover:bg-red-700" onClick={() => applyStatusDecision(false)} disabled={loading}>Rejeter</Button>
-            <Button variant="default" className="bg-green-600 text-white hover:bg-green-700" onClick={() => applyStatusDecision(true)} disabled={loading}>Approuver</Button>
+            <Button variant="secondary" className="bg-red-600 text-white hover:bg-red-700" onClick={() => applyStatusDecision(false)} disabled={updatingReviewId !== null}>
+              {updatingStatusAction === "reject" ? <Spinner className="h-4 w-4" /> : "Rejeter"}
+            </Button>
+            <Button variant="default" className="bg-green-600 text-white hover:bg-green-700" onClick={() => applyStatusDecision(true)} disabled={updatingReviewId !== null}>
+              {updatingStatusAction === "approve" ? <Spinner className="h-4 w-4" /> : "Approuver"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -256,8 +506,15 @@ export default function AdminAvis() {
           </DialogHeader>
           <p>Voulez-vous vraiment supprimer cet avis ? Cette action est irréversible.</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Annuler</Button>
-            <Button variant="accent" className="bg-destructive hover:bg-destructive/90" onClick={async () => { if (confirmDeleteId) { await deleteReview(confirmDeleteId); setConfirmDeleteId(null); } }}>Supprimer</Button>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)} disabled={loading}>Annuler</Button>
+            <Button
+              variant="accent"
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={async () => { if (confirmDeleteId) { await deleteReview(confirmDeleteId); setConfirmDeleteId(null); } }}
+              disabled={loading}
+            >
+              {loading ? <Spinner className="h-4 w-4" /> : "Supprimer"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

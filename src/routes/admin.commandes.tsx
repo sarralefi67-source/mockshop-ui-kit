@@ -1034,14 +1034,22 @@ function AdminOrders() {
           </TableBody>
         </Table>
         </div>
-        <div className="flex items-center justify-between px-3 py-3">
-          <div className="text-sm text-muted-foreground">
-            {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, filtered.length)} sur {filtered.length}
+        <div className="flex items-center justify-between gap-4 px-3 py-3">
+          <div className="text-sm text-foreground">
+            {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} sur {filtered.length}
           </div>
           <div>
-            <Pagination>
+            <Pagination className="mx-0 w-auto justify-end text-foreground">
               <PaginationContent>
-                <PaginationPrevious onClick={() => setPage((p) => Math.max(1, p - 1))} />
+                <PaginationPrevious
+                  href="#"
+                  className={page === 1 ? "pointer-events-none opacity-50 text-foreground" : "text-foreground"}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((p) => Math.max(1, p - 1));
+                  }}
+                  aria-disabled={page === 1}
+                />
                 {(() => {
                   const pages: number[] = [];
                   const maxShown = 7;
@@ -1055,11 +1063,26 @@ function AdminOrders() {
                   }
                   return pages.map((p) => (
                     <PaginationItem key={p}>
-                      <PaginationLink isActive={p === page} onClick={(e) => { e.preventDefault(); setPage(p); }}>{p}</PaginationLink>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === page}
+                        className="text-foreground"
+                        onClick={(e) => { e.preventDefault(); setPage(p); }}
+                      >
+                        {p}
+                      </PaginationLink>
                     </PaginationItem>
                   ));
                 })()}
-                <PaginationNext onClick={() => setPage((p) => Math.min(totalPages, p + 1))} />
+                <PaginationNext
+                  href="#"
+                  className={page === totalPages ? "pointer-events-none opacity-50 text-foreground" : "text-foreground"}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPage((p) => Math.min(totalPages, p + 1));
+                  }}
+                  aria-disabled={page === totalPages}
+                />
               </PaginationContent>
             </Pagination>
           </div>

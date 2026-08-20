@@ -66,13 +66,22 @@ export function ProductDetails({
                 <button
                   key={value.id}
                   onClick={() => onSelectAttribute?.(attr.code, value.id)}
-                  className={cn("min-w-16 rounded-md border px-4 py-2 text-sm font-medium transition hover:border-muted-foreground")}
+                  className={cn(
+                    "rounded-md border transition hover:border-muted-foreground",
+                    attr.type === "image" ? "grid h-11 w-11 place-items-center p-0" : "min-w-16 px-4 py-2 text-sm font-medium"
+                  )}
                 >
-                  {attr.type === 'swatch' ? (
+                  {attr.type === "swatch" ? (
                     <span className="inline-flex items-center gap-2">
                       <span className="h-5 w-5 rounded-full border" style={{ backgroundColor: value.hex }} />
                       <span>{value.label}</span>
                     </span>
+                  ) : attr.type === "image" ? (
+                    <img
+                      src={value.image_url || value.label}
+                      alt={value.label}
+                      className="h-8 w-8 rounded-full border border-border object-cover"
+                    />
                   ) : (
                     <span>{value.label}</span>
                   )}

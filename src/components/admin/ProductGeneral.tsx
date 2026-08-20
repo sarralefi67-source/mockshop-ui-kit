@@ -19,7 +19,12 @@ export default function ProductGeneral({
     <div className="grid gap-4 pt-5 sm:grid-cols-2">
       <div className="space-y-2 sm:col-span-2">
         <Label>Nom</Label>
-        <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <Input
+          required
+          autoFocus
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+        />
       </div>
      
       <div className="space-y-2">

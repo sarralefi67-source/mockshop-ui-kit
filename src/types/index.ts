@@ -218,33 +218,33 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
-          is_active: boolean | null
           name: string
           parent_id: string | null
-          position: number | null
           slug: string
+          subcategories_count: number
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
-          is_active?: boolean | null
           name: string
           parent_id?: string | null
-          position?: number | null
           slug: string
+          subcategories_count?: number
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
           id?: string
           image_url?: string | null
-          is_active?: boolean | null
           name?: string
           parent_id?: string | null
-          position?: number | null
           slug?: string
+          subcategories_count?: number
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -900,6 +900,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_admin_dashboard_kpis: {
+        Args: never
+        Returns: {
+          customers: number
+          orders: number
+          revenue: number
+          average_basket: number
+          customers_delta_percent: number | null
+          orders_delta_percent: number | null
+          revenue_delta_percent: number | null
+          average_basket_delta_percent: number | null
+        }
+      }
+      get_admin_monthly_sales: {
+          Args: { p_months?: number }
+          Returns: Array<{
+            month: string
+            total: number
+          }>
+      }
+        get_admin_low_stock_products: {
+          Args: { p_limit?: number }
+          Returns: Json
+        }
+        get_admin_recent_orders: {
+          Args: { p_limit?: number }
+          Returns: Json
+        }
+      get_admin_customers_list: {
+          Args: never
+          Returns: Json
+        }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -926,8 +958,8 @@ export type ProductAttribute = {
   id: string
   name: string
   code: string
-  type: 'swatch' | 'button'
-  values: { id: string; label: string; hex?: string }[]
+  type: 'swatch' | 'button' | 'image'
+  values: { id: string; label: string; hex?: string; image_url?: string }[]
 }
 
 export type ProductVariant = {
@@ -937,11 +969,11 @@ export type ProductVariant = {
   // keyed by the REAL attribute id (attributes.id) -> the chosen attribute_values.id
   options: Record<string, string>
   price: number
+  cost_price?: number | null
   compare_at_price: number | null
   promo_percent?: number | null
   price_after_promo?: number | null
   stock: number
-  is_active: boolean
   position?: number
 }
 
@@ -954,6 +986,7 @@ export type Product = {
   short_description: string
   description: string
   price: number
+  cost_price?: number | null
   compare_at_price: number | null
   promo_percent?: number | null
   price_after_promo?: number | null
@@ -1009,11 +1042,11 @@ export type Category = {
   parent_id: string | null
   name: string
   slug: string
-  description: string | null
-  position: number
-  is_active: boolean
+  description?: string | null
   image_url?: string | null
+  subcategories_count?: number
   created_at?: string
+  updated_at?: string
 }
 
 export type CategoryNode = Category & {

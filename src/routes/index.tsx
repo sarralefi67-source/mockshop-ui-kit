@@ -43,55 +43,15 @@ function HomePage() {
   return (
     <StoreLayout>
       {/* Hero */}
-      <section className="border-b border-border bg-surface">
+      {/* <section className="border-b border-border bg-surface">
         <div className="container-page grid items-center gap-8 py-12 md:grid-cols-2 md:py-20">
-          <div>
-            <span className="inline-block rounded-full bg-accent-strong/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent-strong">
-              Soldes d'été — jusqu'à -40%
-            </span>
-            <h1 className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-              La high-tech livrée chez vous,
-              <span className="text-accent-strong"> payée à la livraison</span>
-            </h1>
-            <p className="mt-4 max-w-md text-muted-foreground">
-              Plus de 2 000 références en informatique, téléphonie, maison et accessoires.
-              Livraison 24/48h dans les 24 gouvernorats.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button variant="accent" size="lg" asChild>
-                <Link to="/promotions">
-                  Voir les promos <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outline" size="lg" asChild>
-                <Link to="/categorie/$slug" params={{ slug: "informatique" }}>
-                  Explorer l'informatique
-                </Link>
-              </Button>
-            </div>
-            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-              <li className="flex items-center gap-2"><Truck className="h-4 w-4 text-accent-strong" /> Livraison 24/48h</li>
-              <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-accent-strong" /> Garantie 12 mois</li>
-              <li className="flex items-center gap-2"><Headphones className="h-4 w-4 text-accent-strong" /> Support 6j/7</li>
-            </ul>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {products.slice(0, 4).map((p) => (
-              <Link
-                key={p.id}
-                to="/produit/$slug"
-                params={{ slug: p.slug }}
-                className="overflow-hidden rounded-xl border border-border bg-card"
-              >
-                <img src={p.images[0]?.url} alt={p.name} className="aspect-square w-full object-cover" />
-              </Link>
-            ))}
-          </div>
+        banners
+        
         </div>
-      </section>
+      </section> */}
 
       {/* Catégories */}
-      <section className="container-page py-12">
+      {/* <section className="container-page py-12">
         <div className="flex items-end justify-between">
           <h2 className="text-2xl font-bold">Catégories phares</h2>
         </div>
@@ -116,7 +76,7 @@ function HomePage() {
             </Link>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* Promos */}
       <section className="border-y border-border bg-surface py-12">

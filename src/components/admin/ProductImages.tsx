@@ -92,11 +92,14 @@ export default function ProductImages({ draft, setDraft }: { draft: Product; set
               <Label className="text-xs">Associer à</Label>
               <div className="mt-1">
                 <Select value={img.variant_value ?? ""} onValueChange={async (v) => {
+                  const nextValue = v || null;
+
                   // local update
-                  setDraft({ ...draft, images: draft.images.map((i) => i.id === img.id ? { ...i, variant_value: v || null } : i) });
-                  if (!draft.id) return;
+                  setDraft({ ...draft, images: draft.images.map((i) => i.id === img.id ? { ...i, variant_value: nextValue } : i) });
+
+                  if (!img.id) return;
                   try {
-                    const { error } = await supabase.from("product_images").update({ variant_value: v || null }).eq("id", img.id);
+                    const { error } = await supabase.from("product_images").update({ variant_value: nextValue }).eq("id", img.id);
                     if (error) throw error;
                     toast.success("Association enregistrée.");
                   } catch (e) {

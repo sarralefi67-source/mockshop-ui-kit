@@ -2,12 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Mail, Phone, UserRound } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import SortArrow from "@/components/ui/sort-arrow";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { formatPrice } from "@/lib/placeholder";
 
 export const Route = createFileRoute("/admin/clients")({
@@ -33,58 +40,44 @@ type CustomerOrder = {
   created_at?: string | null;
 };
 
-type CustomerAddress = {
-  id: string;
-  full_name?: string | null;
-  phone?: string | null;
-  address_line?: string | null;
-  city?: string | null;
-  governorate?: string | null;
-  postal_code?: string | null;
-  is_default?: boolean | null;
-};
+function LoadingTableRow() {
+  return (
+    <TableRow>
+      <TableCell colSpan={6} className="py-12 text-center">
+        <div className="inline-flex items-center gap-2 text-muted-foreground">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          Chargement des clients…
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 export default function AdminClients() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
-  const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
+  const [sortKey, setSortKey] = useState<"order_count" | "total_spent">("order_count");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadCustomers = async () => {
     setLoading(true);
     try {
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("role", "customer")
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabase.rpc("get_admin_customers_list");
 
-      if (profilesError) throw profilesError;
+      if (error) throw error;
 
-      const rows = await Promise.all(
-        (profiles ?? []).map(async (profile: any) => {
-          const { data: orders } = await supabase
-            .from("orders")
-            .select("id, order_number, status, total, created_at")
-            .eq("user_id", profile.id);
-
-          const order_count = orders?.length ?? 0;
-          const total_spent = (orders ?? []).reduce((sum: number, order: any) => sum + Number(order.total ?? 0), 0);
-
-          return {
-            id: profile.id,
-            first_name: profile.first_name ?? null,
-            last_name: profile.last_name ?? null,
-            phone: profile.phone ?? null,
-            email: profile.email ?? null,
-            created_at: profile.created_at ?? null,
-            order_count,
-            total_spent,
-          } satisfies CustomerRow;
-        })
-      );
+      const rows = (data ?? []).map((customer: any) => ({
+        id: customer.id,
+        first_name: customer.first_name ?? null,
+        last_name: customer.last_name ?? null,
+        phone: customer.phone ?? null,
+        email: customer.email ?? null,
+        created_at: customer.created_at ?? null,
+        order_count: Number(customer.order_count ?? 0),
+        total_spent: Number(customer.total_spent ?? 0),
+      })) satisfies CustomerRow[];
 
       setCustomers(rows);
     } catch (err) {
@@ -113,34 +106,42 @@ export default function AdminClients() {
     });
   }, [customers, query]);
 
-  const openCustomer = async (customerId: string) => {
-    setSelectedCustomerId(customerId);
-    const customer = customers.find((c) => c.id === customerId);
-    if (!customer) return;
+  const sortedCustomers = useMemo(() => {
+    const nextCustomers = [...filteredCustomers];
 
-    try {
-      const [{ data: orders }, { data: addresses }] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("id, order_number, status, total, created_at")
-          .eq("user_id", customerId)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("addresses")
-          .select("*")
-          .eq("user_id", customerId)
-          .order("is_default", { ascending: false }),
-      ]);
+    nextCustomers.sort((a, b) => {
+      const modifier = sortDirection === "asc" ? 1 : -1;
+      const left = a[sortKey] ?? 0;
+      const right = b[sortKey] ?? 0;
+      return (left - right) * modifier;
+    });
 
-      setCustomerOrders((orders ?? []) as CustomerOrder[]);
-      setCustomerAddresses((addresses ?? []) as CustomerAddress[]);
-    } catch (err) {
-      console.error("openCustomer", err);
-      toast.error("Impossible de charger le détail client.");
+    return nextCustomers;
+  }, [filteredCustomers, sortDirection, sortKey]);
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(sortedCustomers.length / pageSize));
+  const pageCustomers = sortedCustomers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, sortedCustomers.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, sortKey, sortDirection]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const toggleSort = (key: "order_count" | "total_spent") => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
     }
-  };
 
-  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId) ?? null;
+    setSortKey(key);
+    setSortDirection("desc");
+  };
 
   return (
     <div className="space-y-6">
@@ -168,30 +169,49 @@ export default function AdminClients() {
               <TableHead>Nom</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Téléphone</TableHead>
-              <TableHead>Nb commandes</TableHead>
-              <TableHead>Total dépensé</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => toggleSort("order_count")}
+                  className="inline-flex items-center gap-1 font-medium text-left"
+                >
+                  <span>Nb commandes</span>
+                  <SortArrow
+                    dir={sortKey === "order_count" ? sortDirection : null}
+                    ariaLabel="Trier par nombre de commandes"
+                  />
+                </button>
+              </TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => toggleSort("total_spent")}
+                  className="inline-flex items-center gap-1 font-medium text-left"
+                >
+                  <span>Total dépensé</span>
+                  <SortArrow
+                    dir={sortKey === "total_spent" ? sortDirection : null}
+                    ariaLabel="Trier par total dépensé"
+                  />
+                </button>
+              </TableHead>
               <TableHead>Date d’inscription</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
-                  Chargement des clients…
-                </TableCell>
-              </TableRow>
-            ) : filteredCustomers.length === 0 ? (
+              <LoadingTableRow />
+            ) : sortedCustomers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
                   Aucun client trouvé.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCustomers.map((customer) => (
+              pageCustomers.map((customer) => (
                 <TableRow
                   key={customer.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => openCustomer(customer.id)}
+                  className="hover:bg-muted/50"
                 >
                   <TableCell className="font-medium">
                     {customer.first_name || customer.last_name
@@ -212,83 +232,53 @@ export default function AdminClients() {
         </Table>
       </div>
 
-      <Dialog open={selectedCustomer !== null} onOpenChange={(open) => !open && setSelectedCustomerId(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedCustomer ? `${selectedCustomer.first_name ?? ""} ${selectedCustomer.last_name ?? ""}`.trim() || "Client" : "Client"}
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedCustomer && (
-            <div className="space-y-6">
-              <div className="grid gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedCustomer.email ?? "Email non renseigné"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{selectedCustomer.phone ?? "Téléphone non renseigné"}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <UserRound className="h-4 w-4 text-muted-foreground" />
-                  <span>Inscrit le {selectedCustomer.created_at ? format(new Date(selectedCustomer.created_at), "dd/MM/yyyy") : "—"}</span>
-                </div>
-              </div>
-
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div>
-                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Commandes</h3>
-                  <div className="space-y-2">
-                    {customerOrders.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Aucune commande pour ce client.</p>
-                    ) : (
-                      customerOrders.map((order) => (
-                        <div key={order.id} className="rounded-md border border-border p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">{order.order_number}</span>
-                            <span className="text-xs rounded-full bg-muted px-2 py-1 text-muted-foreground">{order.status}</span>
-                          </div>
-                          <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
-                            <span>{order.created_at ? format(new Date(order.created_at), "dd/MM/yyyy") : "—"}</span>
-                            <span className="font-medium text-foreground">{formatPrice(order.total)}</span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Adresses</h3>
-                  <div className="space-y-2">
-                    {customerAddresses.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Aucune adresse enregistrée.</p>
-                    ) : (
-                      customerAddresses.map((address) => (
-                        <div key={address.id} className="rounded-md border border-border p-3 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{address.full_name ?? "Adresse"}</span>
-                            {address.is_default && <span className="text-xs text-accent-strong">Par défaut</span>}
-                          </div>
-                          <p className="mt-1 text-muted-foreground">{address.address_line ?? "—"}</p>
-                          <p className="text-muted-foreground">{[address.city, address.governorate, address.postal_code].filter(Boolean).join(" — ") || "—"}</p>
-                          {address.phone && <p className="mt-1 text-muted-foreground">{address.phone}</p>}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setSelectedCustomerId(null)}>Fermer</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {sortedCustomers.length > 0 && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm text-foreground">
+            {pageStart}–{pageEnd} sur {sortedCustomers.length}
+          </span>
+          <Pagination className="mx-0 w-auto justify-end text-foreground">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setCurrentPage((page) => Math.max(1, page - 1));
+                  }}
+                  aria-disabled={currentPage === 1}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    href="#"
+                    isActive={currentPage === page}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage(page);
+                    }}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setCurrentPage((page) => Math.min(totalPages, page + 1));
+                  }}
+                  aria-disabled={currentPage === totalPages}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }

@@ -30,14 +30,35 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export const Route = createFileRoute("/admin/produits")({
   component: AdminProducts,
 });
 
+// Date.now() seul peut renvoyer deux fois la même valeur si deux ids sont
+// générés dans la même milliseconde (ex: ajouter plusieurs valeurs
+// d'attribut rapidement). Deux entrées avec le même id cassent React (clés
+// dupliquées) et font que "Supprimer" semble ne rien faire, ou supprime la
+// mauvaise ligne. On utilise crypto.randomUUID() quand disponible, avec un
+// repli robuste sinon.
+const genId = (prefix: string) => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const emptyProduct: Product = {
   id: "", name: "", slug: "", brand: "", category_id: "",
-  short_description: "", description: "", price: 0, compare_at_price: null, stock: 0,
+  short_description: "", description: "", price: 0, cost_price: null, compare_at_price: null, stock: 0,
   sku: "", is_active: true, is_new: false, rating: 0, reviews_count: 0,
   created_at: new Date().toISOString().slice(0, 10),
   images: [], attributes: [], variants: [], tags: [],
@@ -54,8 +75,13 @@ function AdminProducts() {
   const [stockSort, setStockSort] = useState<"asc" | "desc" | null>(null);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
- const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
- const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+
+  // Sélection de variante par ATTRIBUT (ex: { attrCouleurId: valRougeId, attrTailleId: valMId })
+  // plutôt que par id de variante directement — reproduit le comportement de la fiche
+  // produit boutique où l'on choisit des options une par une jusqu'à résoudre la variante.
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+
   const [toggleConfirm, setToggleConfirm] = useState<{ id: string; next: boolean } | null>(null);
   const [isToggling, setIsToggling] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -64,6 +90,8 @@ function AdminProducts() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Product>(emptyProduct);
+  const [removedAttributeIds, setRemovedAttributeIds] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // client-side filtering + sorting
   let filtered = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()));
@@ -110,6 +138,25 @@ function AdminProducts() {
     filtered = [...filtered].sort((a, b) => (stockSort === "asc" ? a.stock - b.stock : b.stock - a.stock));
   }
 
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedProducts = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = (currentPage - 1) * pageSize + 1;
+  const pageEnd = Math.min(currentPage * pageSize, filtered.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, stockFilter, categoryFilter, priceSort, stockSort]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const looksLikeImageValue = (value: unknown) => {
+    const stringValue = String(value ?? "");
+    return /^(https?:\/\/|data:image\/|\/)/i.test(stringValue) || /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(stringValue);
+  };
+
   const fetchProducts = async () => {
     setLoading(true);
     const { data, error } = await supabase.from("products").select(`
@@ -139,17 +186,22 @@ function AdminProducts() {
       console.warn("could not load categories map", e);
     }
     const mapped = (data ?? []).map((d: any) => {
-      const attributes = (d.product_attributes ?? []).map((pa: any) => pa.attributes).filter(Boolean).map((a: any) => ({
-        id: a.id,
-        name: a.name,
-        code: a.id,
-        type: a.display_type === "color_swatch" ? "swatch" : "button",
-        values: (a.attribute_values ?? []).slice().sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0)).map((v: any) => ({
-          id: v.id,
-          label: v.value,
-          hex: v.color_hex ?? undefined,
-        })),
-      }));
+      const attributes = (d.product_attributes ?? []).map((pa: any) => pa.attributes).filter(Boolean).map((a: any) => {
+        const values = (a.attribute_values ?? []).slice().sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0));
+        const isImageAttribute = a.display_type === "image_swatch" || values.some((v: any) => looksLikeImageValue(v.value));
+        return {
+          id: a.id,
+          name: a.name,
+          code: a.id,
+          type: a.display_type === "color_swatch" ? "swatch" : isImageAttribute ? "image" : "button",
+          values: values.map((v: any) => ({
+            id: v.id,
+            label: v.value,
+            image_url: isImageAttribute ? v.value : undefined,
+            hex: v.color_hex ?? undefined,
+          })),
+        };
+      });
       return {
         id: d.id,
         name: d.name,
@@ -159,6 +211,7 @@ function AdminProducts() {
         short_description: d.short_description ?? "",
         description: d.description ?? "",
         price: Number(d.base_price ?? 0),
+        cost_price: d.cost_price == null ? null : Number(d.cost_price),
         compare_at_price: d.compare_at_price ? Number(d.compare_at_price) : null,
         stock: d.stock_quantity ?? 0,
         sku: d.sku ?? "",
@@ -184,6 +237,7 @@ function AdminProducts() {
           }, {}),
           price: Number(v.price),
           compare_at_price: v.compare_at_price ? Number(v.compare_at_price) : null,
+          cost_price: v.cost_price == null ? null : Number(v.cost_price),
           stock: v.stock_quantity ?? 0,
           is_active: v.is_active ?? true,
           position: v.position ?? 0,
@@ -271,7 +325,7 @@ function AdminProducts() {
       for (const attr of workingAttributes) {
         const attrPayload = {
           name: attr.name,
-          display_type: attr.type === "swatch" ? "color_swatch" : "select",
+          display_type: attr.type === "swatch" ? "color_swatch" : attr.type === "image" ? "image_swatch" : "select",
         };
         const isNewAttr = attr.id.startsWith("attr-");
         if (isNewAttr) {
@@ -288,11 +342,25 @@ function AdminProducts() {
           .upsert({ product_id: productId, attribute_id: attr.id }, { onConflict: "product_id,attribute_id" });
         if (linkErr) throw linkErr;
 
+        // ---- Valeurs de cet attribut : on gère aussi la SUPPRESSION ----
+        // Avant, on ne faisait qu'insert/update sur les valeurs présentes dans
+        // draft.attributes — si l'utilisateur retirait une valeur côté UI (bouton
+        // "supprimer" sur une couleur/taille), rien ne la supprimait jamais en
+        // base : elle réapparaissait après rechargement. On calcule ici la
+        // différence entre les valeurs existantes en base et celles gardées
+        // dans le draft pour supprimer le reste.
+        const { data: existingValueRows, error: existingValuesError } = await supabase
+          .from("attribute_values")
+          .select("id")
+          .eq("attribute_id", attr.id);
+        if (existingValuesError) throw existingValuesError;
+        const keptValueIds: string[] = [];
+
         for (const [i, val] of attr.values.entries()) {
           const oldId = val.id;
           const valPayload = {
             attribute_id: attr.id,
-            value: val.label,
+            value: attr.type === "image" ? (val.image_url || val.label) : val.label,
             color_hex: attr.type === "swatch" ? (val.hex ?? null) : null,
             position: i,
           };
@@ -305,22 +373,67 @@ function AdminProducts() {
             if (error) throw error;
           }
           oldValueIdToNewValueId[oldId] = val.id;
+          keptValueIds.push(val.id);
+        }
+
+        const valueIdsToDelete = (existingValueRows ?? [])
+          .map((row: any) => row.id as string)
+          .filter((id: string) => !keptValueIds.includes(id));
+        if (valueIdsToDelete.length) {
+          const { error: delValuesErr } = await supabase
+            .from("attribute_values")
+            .delete()
+            .in("id", valueIdsToDelete);
+          if (delValuesErr) throw delValuesErr;
         }
       }
 
       // supprimer les attributs retirés du produit (juste le lien produit<->attribut, on ne
       // touche pas à la table `attributes` qui pourrait être référencée ailleurs)
-      if (draft.id) {
-        const { data: existingLinks } = await supabase.from("product_attributes").select("attribute_id").eq("product_id", productId);
+      if (productId) {
+        const { data: existingLinks, error: existingLinksError } = await supabase
+          .from("product_attributes")
+          .select("attribute_id")
+          .eq("product_id", productId);
+        if (existingLinksError) throw existingLinksError;
         const keepAttrIds = workingAttributes.map((a) => a.id);
-        const toUnlink = (existingLinks ?? []).map((l: any) => l.attribute_id).filter((id: string) => !keepAttrIds.includes(id));
+        const removedByDiff = (existingLinks ?? [])
+          .map((l: any) => l.attribute_id)
+          .filter((id: string) => !keepAttrIds.includes(id));
+        const toUnlink = [...new Set([...removedByDiff, ...removedAttributeIds])];
         if (toUnlink.length) {
           const { error } = await supabase.from("product_attributes").delete().eq("product_id", productId).in("attribute_id", toUnlink);
           if (error) throw error;
+
+          // Les attributs créés pour ce produit ne doivent pas rester visibles
+          // après leur retrait. On conserve ceux encore utilisés ailleurs.
+          for (const attributeId of toUnlink) {
+            const { data: remainingLinks, error: remainingLinksError } = await supabase
+              .from("product_attributes")
+              .select("product_id")
+              .eq("attribute_id", attributeId)
+              .limit(1);
+            if (remainingLinksError) throw remainingLinksError;
+            if (!remainingLinks?.length) {
+              const { error: deleteAttributeError } = await supabase.from("attributes").delete().eq("id", attributeId);
+              if (deleteAttributeError) throw deleteAttributeError;
+            }
+          }
         }
       }
 
-      // ---- 3) variantes ----
+      // ---- 3) images associées à une valeur d'attribut ----
+      for (const img of draft.images) {
+        if (!img.id) continue;
+        const mappedVariantValue = img.variant_value ? (oldValueIdToNewValueId[img.variant_value] ?? img.variant_value) : null;
+        const { error: imgLinkErr } = await supabase
+          .from("product_images")
+          .update({ variant_value: mappedVariantValue })
+          .eq("id", img.id);
+        if (imgLinkErr) throw imgLinkErr;
+      }
+
+      // ---- 4) variantes ----
       const { data: existingVariantsRows } = await supabase.from("product_variants").select("id").eq("product_id", productId);
       const existingVariantIds = (existingVariantsRows ?? []).map((e: any) => e.id);
       const keptVariantIds: string[] = [];
@@ -391,11 +504,11 @@ function AdminProducts() {
   /* ---- gestion des attributs / variantes dans le formulaire ---- */
   const addAttribute = () => {
     const attr: ProductAttribute = {
-      id: `attr-${Date.now()}`,
+      id: genId("attr"),
       name: "Couleur",
       code: `attr_${draft.attributes.length + 1}`,
       type: "swatch",
-      values: [],
+      values: [{ id: genId("val"), label: "Aspen Black", hex: "#111827" }],
     };
     setDraft({ ...draft, attributes: [...draft.attributes, attr] });
   };
@@ -406,7 +519,10 @@ function AdminProducts() {
       attributes: draft.attributes.map((a: ProductAttribute) => (a.id === id ? { ...a, ...patch } : a)),
     });
 
-  const removeAttribute = (id: string) =>
+  const removeAttribute = (id: string) => {
+    if (!id.startsWith("attr-")) {
+      setRemovedAttributeIds((current) => (current.includes(id) ? current : [...current, id]));
+    }
     setDraft({
       ...draft,
       attributes: draft.attributes.filter((a) => a.id !== id),
@@ -416,19 +532,42 @@ function AdminProducts() {
         return { ...v, options: rest };
       }),
     });
+  };
 
   const addValue = (attrId: string) =>
     updateAttribute(attrId, {
       values: [
         ...(draft.attributes.find((a) => a.id === attrId)?.values ?? []),
-        { id: `val-${Date.now()}`, label: "Nouvelle valeur", hex: "#cccccc" },
+        { id: genId("val"), label: "Aspen Black", hex: "#111827" },
       ],
     });
+
+  // Supprime une valeur (ex: une couleur ou une taille) d'un attribut.
+  // C'était la pièce manquante : addValue existait pour ajouter, mais aucune
+  // fonction équivalente n'existait pour retirer une valeur, et rien n'était
+  // passé en prop à AttributesVariants pour ça — donc le bouton "supprimer"
+  // dans l'onglet Attributs n'avait aucun handler à appeler.
+  // On retire aussi cette valeur de toutes les variantes qui l'utilisaient,
+  // sinon une variante garderait une référence à un value_id qui n'existe
+  // plus dans draft.attributes (incohérence silencieuse au moment du save).
+  const removeValue = (attrId: string, valueId: string) => {
+    setDraft({
+      ...draft,
+      attributes: draft.attributes.map((a) =>
+        a.id === attrId ? { ...a, values: a.values.filter((v) => v.id !== valueId) } : a
+      ),
+      variants: draft.variants.map((v) => {
+        if (v.options[attrId] !== valueId) return v;
+        const { [attrId]: _removed, ...rest } = v.options;
+        return { ...v, options: rest };
+      }),
+    });
+  };
 
   const addVariant = () => {
     const defaultVariantPrice = draft.variants.length > 0 ? draft.variants[0]?.price ?? draft.price : draft.price;
     const variant: ProductVariant = {
-      id: `v-${Date.now()}`,
+      id: genId("v"),
       product_id: draft.id || "new",
       // sku will be generated by the DB trigger; keep empty here
       sku: "",
@@ -511,7 +650,7 @@ function AdminProducts() {
             <Button variant="ghost" onClick={refresh} title="Rafraîchir" style={{ border: "1px solid", borderColor: "hsl(240, 3.7%, 15.9%)" }}>
               ↻
             </Button>
-            <Button variant="accent" onClick={() => { setDraft(emptyProduct); setOpen(true); }}>
+              <Button variant="accent" onClick={() => { setDraft(emptyProduct); setRemovedAttributeIds([]); setOpen(true); }}>
               <Plus className="h-4 w-4" /> Nouveau produit
             </Button>
           </div>
@@ -524,7 +663,6 @@ function AdminProducts() {
             <TableRow>
               <TableHead className="w-16"></TableHead>
               <TableHead>Produit</TableHead>
-              <TableHead>Catégorie</TableHead>
               <TableHead>
                 <button type="button" className="flex items-center gap-2" onClick={togglePriceSort}>
                   <span>Prix</span>
@@ -559,14 +697,14 @@ function AdminProducts() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((p) => (
+              paginatedProducts.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
-                    <Avatar>
+                    <Avatar className="h-10 w-10 rounded-md">
                       {mainImage(p.images)?.url ? (
-                        <AvatarImage src={mainImage(p.images)!.url} alt={p.name} />
+                        <AvatarImage src={mainImage(p.images)!.url} alt={p.name} className="h-full w-full rounded-md object-cover" />
                       ) : (
-                        <AvatarFallback>{p.name.slice(0, 1)}</AvatarFallback>
+                        <AvatarFallback className="rounded-md">{p.name.slice(0, 1)}</AvatarFallback>
                       )}
                     </Avatar>
                   </TableCell>
@@ -574,16 +712,20 @@ function AdminProducts() {
                     <p className="font-medium">{p.name}</p>
                     <p className="text-xs text-muted-foreground">{p.sku}</p>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {categoriesMap[p.category_id ?? ""] ?? "—"}
-                  </TableCell>
+                 
+                 
 
-                  <TableCell className="font-semibold">
-                    {p.variants.length > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                        Prix par variante
-                      </span>
-                    ) : (
+                 <TableCell className="font-semibold">
+                    {p.variants.length > 0 ? (() => {
+                      const { min, max } = priceRangeForProduct(p);
+                      return min === max ? (
+                        <span>{formatPrice(min)}</span>
+                      ) : (
+                        <span className="text-sm">
+                          {formatPrice(min)} – {formatPrice(max)}
+                        </span>
+                      );
+                    })() : (
                       formatPrice(p.price)
                     )}
                   </TableCell>
@@ -598,11 +740,16 @@ function AdminProducts() {
                   </TableCell>
                   <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                      
-                        <Button size="sm" variant="outline" onClick={() => { setViewProduct(p); setSelectedVariantId(null); setSelectedImageId(null); }} aria-label="Voir">
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setViewProduct(p); setSelectedOptions({}); setSelectedImageId(null); }}
+                          aria-label="Voir"
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setDraft(p); setOpen(true); }}>
+                          <Button size="sm" variant="ghost" onClick={() => { setDraft(p); setRemovedAttributeIds([]); setOpen(true); }}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmDeleteId(p.id)}>
@@ -617,18 +764,66 @@ function AdminProducts() {
         </Table>
       </div>
 
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm text-foreground">
+            {pageStart}–{pageEnd} sur {filtered.length}
+          </span>
+          <Pagination className="mx-0 w-auto justify-end text-foreground">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setCurrentPage((page) => Math.max(1, page - 1));
+                  }}
+                  aria-disabled={currentPage === 1}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    href="#"
+                    isActive={currentPage === page}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setCurrentPage(page);
+                    }}
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setCurrentPage((page) => Math.min(totalPages, page + 1));
+                  }}
+                  aria-disabled={currentPage === totalPages}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
     {/* View product dialog */}
     <Dialog
       open={Boolean(viewProduct)}
       onOpenChange={(v) => {
         if (!v) {
           setViewProduct(null);
-          setSelectedVariantId(null);
+          setSelectedOptions({});
           setSelectedImageId(null);
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{viewProduct ? viewProduct.name : ""}</DialogTitle>
         </DialogHeader>
@@ -638,42 +833,80 @@ function AdminProducts() {
             (a, b) => Number(b.is_main) - Number(a.is_main) || a.position - b.position
           );
 
-          const selectedVariant = viewProduct.variants.find((v) => v.id === selectedVariantId) ?? null;
+          const hasVariants = viewProduct.variants.length > 0;
 
-          // labels des valeurs choisies pour la variante sélectionnée (ex: "Rouge", "M"...)
-          const variantLabels = selectedVariant
-            ? (Object.entries(selectedVariant.options)
-                .map(([attrId, valId]) => {
-                  const attr = viewProduct.attributes.find((a) => a.id === attrId);
-                  return attr?.values.find((x) => x.id === valId)?.label;
-                })
-                .filter(Boolean) as string[])
-            : [];
+          const defaultSelectedOptions = hasVariants
+            ? viewProduct.attributes.reduce<Record<string, string>>((acc, attr) => {
+                const firstVariantValue = viewProduct.variants[0]?.options?.[attr.id];
+                if (firstVariantValue) acc[attr.id] = firstVariantValue;
+                return acc;
+              }, {})
+            : {};
 
-          // image liée à cette variante via product_images.variant_value
-          const variantImage = variantLabels.length
-            ? sorted.find((img) => img.variant_value && variantLabels.includes(img.variant_value))
+          const effectiveSelectedOptions = Object.keys(selectedOptions).length > 0 ? selectedOptions : defaultSelectedOptions;
+
+          // La sélection n'est "complète" que si une valeur est choisie pour CHAQUE attribut
+          const isSelectionComplete =
+            viewProduct.attributes.length > 0 &&
+            viewProduct.attributes.every((attr) => Boolean(effectiveSelectedOptions[attr.id]));
+
+          // Variante correspondant exactement à la combinaison choisie (comme côté boutique)
+          const selectedVariant = isSelectionComplete
+            ? viewProduct.variants.find((v) =>
+                viewProduct.attributes.every((attr) => v.options[attr.id] === effectiveSelectedOptions[attr.id])
+              ) ?? null
+            : null;
+
+          // Image liée à la combinaison choisie. product_images.variant_value stocke l'ID
+          // de la valeur d'attribut (attribute_values.id) — donc on compare aux VALEURS
+          // sélectionnées (ids), pas aux labels. C'est ce qui empêchait l'image de
+          // s'afficher : avant on comparait à des labels ("Rouge") alors que la colonne
+          // contient des ids.
+          const chosenValueIds = Object.values(effectiveSelectedOptions);
+          const variantImage = chosenValueIds.length
+            ? sorted.find((img) => img.variant_value && chosenValueIds.includes(img.variant_value))
             : null;
 
           const activeImage = selectedImageId
             ? sorted.find((img) => img.id === selectedImageId) ?? variantImage ?? sorted[0]
             : variantImage ?? sorted[0];
 
+          const resolveAttributeImage = (valueId: string) => {
+            const value = viewProduct.attributes
+              .flatMap((attr) => attr.values)
+              .find((item) => item.id === valueId);
+            if (value?.image_url && looksLikeImageValue(value.image_url)) return value.image_url;
+            if (value?.label && looksLikeImageValue(value.label)) return value.label;
+            return viewProduct.images.find((img) => img.variant_value === valueId)?.url;
+          };
+
           const displayPrice = selectedVariant ? selectedVariant.price : viewProduct.price;
           const displayComparePrice = selectedVariant ? selectedVariant.compare_at_price : viewProduct.compare_at_price;
           const displayStock = selectedVariant ? selectedVariant.stock : viewProduct.stock;
+          const variantPrices = viewProduct.variants.map((variant) => variant.price);
+          const variantPromoPrices = viewProduct.variants.map((variant) => variant.cost_price ?? variant.price);
+          const hasOneGlobalPrice =
+            !hasVariants ||
+            (variantPrices.every((price) => price === variantPrices[0]) &&
+              variantPromoPrices.every((price) => price === variantPromoPrices[0]));
+          const globalOriginalPrice = hasVariants ? viewProduct.variants[0]?.price ?? viewProduct.price : viewProduct.price;
+          const globalPromoPrice = hasVariants
+            ? viewProduct.variants[0]?.cost_price ?? globalOriginalPrice
+            : viewProduct.cost_price ?? viewProduct.price;
+          const globalDiscountPercent = globalOriginalPrice && globalPromoPrice !== globalOriginalPrice
+            ? Math.round(((globalOriginalPrice - globalPromoPrice) / globalOriginalPrice) * 100)
+            : null;
+
+          const chooseOption = (attributeId: string, valueId: string) => {
+            setSelectedOptions((prev) => ({ ...prev, [attributeId]: valueId }));
+            // laisse l'image suivre automatiquement la nouvelle combinaison
+            setSelectedImageId(null);
+          };
 
           return (
             <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold">Photos</h4>
-                  {selectedVariant && (
-                    <button type="button" className="text-xs underline" onClick={() => setSelectedVariantId(null)}>
-                      Réinitialiser
-                    </button>
-                  )}
-                </div>
+               
 
                 <div className="flex min-h-[320px] items-center justify-center overflow-hidden rounded-xl border border-blue-500 bg-surface">
                   {activeImage?.url ? (
@@ -707,76 +940,185 @@ function AdminProducts() {
                   </div>
                 )}
 
-                {viewProduct.variants.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-bold">Variantes</h4>
-                    <div className="space-y-2">
-                      {[...viewProduct.variants]
-                        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-                        .map((v) => (
-                          <button
-                            type="button"
-                            key={v.id}
-                            onClick={() => setSelectedVariantId(v.id === selectedVariantId ? null : v.id)}
-                            className={cn(
-                              "flex w-full items-center justify-between rounded-md border p-2 text-left transition-colors",
-                              v.id === selectedVariantId
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-                                : "border-border hover:bg-surface",
-                            )}
-                          >
-                            <div className="text-xs">
-                              <div className="font-medium">{v.sku || "—"}</div>
-                              <div className="text-muted-foreground">
-                                {Object.entries(v.options || {})
-                                  .map(([attrId, valId]) => {
-                                    const attr = viewProduct.attributes.find((a) => a.id === attrId);
-                                    const val = attr?.values.find((x) => x.id === valId);
-                                    return attr && val ? `${attr.name}: ${val.label}` : null;
-                                  })
-                                  .filter(Boolean)
-                                  .join(" / ") || "—"}
-                              </div>
-                            </div>
-                            <div className="text-right text-xs">
-                              <div className="font-semibold">{formatPrice(v.price)}</div>
-                              <div className={v.stock === 0 ? "font-semibold text-destructive" : "text-muted-foreground"}>
-                                Stock: {v.stock}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                )}
+             
               </div>
 
               <div className="space-y-4 pt-1">
-                <div className="text-sm space-y-3">
-                  <div><span className="text-muted-foreground">Marque : </span>{viewProduct.brand || "—"}</div>
-                  <div><span className="text-muted-foreground">Catégorie : </span>{categoriesMap[viewProduct.category_id ?? ""] ?? "—"}</div>
-                  <div><span className="text-muted-foreground">SKU : </span>{selectedVariant?.sku || viewProduct.sku || "—"}</div>
-                  <div><span className="text-muted-foreground">Statut : </span>{viewProduct.is_active ? "Actif" : "Inactif"}</div>
-                </div>
-
-                {selectedVariant ? (
-                  <div className="space-y-3 rounded-lg border border-border bg-accent/5 p-3">
-                    <div className="text-sm font-semibold text-foreground">Détails de la variante</div>
-                    <div className="space-y-2 text-sm">
-                      <div><span className="text-muted-foreground">Valeur : </span>{variantLabels.join(" / ") || selectedVariant.sku || "—"}</div>
-                      <div><span className="text-muted-foreground">Prix : </span><span className="font-semibold">{formatPrice(selectedVariant.price)}</span></div>
-                      <div className={selectedVariant.stock === 0 ? "font-semibold text-destructive" : ""}>
-                        <span className="text-muted-foreground">Stock : </span>{selectedVariant.stock}
+                <div className="space-y-3 text-sm">
+                  <div className="text-muted-foreground">
+                    <span className="font-bold text-foreground">Marque :</span> {viewProduct.brand || "—"}
+                  </div>
+               
+                  <div className="text-muted-foreground">
+                    <span className="font-bold text-foreground">SKU :</span> {viewProduct.sku || "—"}
+                  </div>
+                  {hasOneGlobalPrice && (
+                    <div className="mb-3 pt-1">
+                      <div className="font-bold text-foreground">Prix global :</div>
+                      <div className="flex items-baseline gap-2 font-semibold">
+                        <span className="text-xl pt-2">{formatPrice(globalPromoPrice)}</span>
+                        {globalDiscountPercent !== null && (
+                          <span className="text-md text-muted-foreground line-through">{formatPrice(globalOriginalPrice)}</span>
+                        )}
+                        {globalDiscountPercent !== null && (
+                          <span className="text-md font-bold text-destructive">
+                            -{Math.abs(globalDiscountPercent)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className={viewProduct.stock === 0 ? "mt-1 font-semibold text-destructive" : "mt-1 text-muted-foreground"}>
+                        <span className="font-bold text-foreground">Stock global :</span> {viewProduct.stock}
                       </div>
                     </div>
+                  )}
+                     <div className="text-muted-foreground">
+                    <span className="font-bold text-foreground">Catégorie :</span> {categoriesMap[viewProduct.category_id ?? ""] ?? "—"}
                   </div>
-                ) : viewProduct.variants.length > 0 ? (
-                  <div className="rounded-lg border border-border bg-accent/5 p-3 text-sm text-muted-foreground">
-                    Sélectionnez une variante pour afficher son prix et son stock.
+                  <div className="text-muted-foreground">
+                    <span className="font-bold text-foreground">Statut :</span> {viewProduct.is_active ? "Actif" : "Inactif"}
+                  </div>
+                </div>
+
+                {hasVariants ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold">Variantes :</h4>
+
+                    </div>
+
+                    <div className="space-y-2">
+                      {viewProduct.attributes.map((attribute) => {
+                        const selectedValueId = effectiveSelectedOptions[attribute.id];
+                        const selectedValueLabel = attribute.values.find((v) => v.id === selectedValueId)?.label;
+
+                        return (
+                          <div key={attribute.id} className="space-y-2">
+                            <p className="text-sm font-medium">
+                              {attribute.name}
+                          
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {attribute.values.map((value) => {
+                                const isSelected = effectiveSelectedOptions[attribute.id] === value.id;
+
+                                if (attribute.type === "swatch") {
+                                  return (
+                                    <button
+                                      key={value.id}
+                                      type="button"
+                                      title={value.label}
+                                      onClick={() => chooseOption(attribute.id, value.id)}
+                                      className={cn(
+                                        "h-8 w-8 rounded-full border-2 transition",
+                                        isSelected
+                                          ? "border-blue-500 ring-2 ring-blue-200"
+                                          : "border-border hover:border-muted-foreground",
+                                      )}
+                                      style={{ backgroundColor: value.hex || "#e5e7eb" }}
+                                    />
+                                  );
+                                }
+
+                                if (attribute.type === "image" || looksLikeImageValue(value.label) || looksLikeImageValue(value.image_url)) {
+                                  const previewUrl = resolveAttributeImage(value.id);
+                                  return (
+                                    <button
+                                      key={value.id}
+                                      type="button"
+                                      title={value.label}
+                                      onClick={() => chooseOption(attribute.id, value.id)}
+                                      className={cn(
+                                        "grid h-9 w-9 place-items-center overflow-hidden rounded-full border-2 transition",
+                                        isSelected
+                                          ? "border-blue-500 ring-2 ring-blue-200"
+                                          : "border-border hover:border-muted-foreground",
+                                      )}
+                                    >
+                                      {previewUrl ? (
+                                        <img
+                                          src={previewUrl}
+                                          alt={value.label}
+                                          className="h-full w-full rounded-full object-cover"
+                                        />
+                                      ) : (
+                                        <span className="grid h-full w-full place-items-center rounded-full border border-dashed border-border bg-muted text-[7px] text-muted-foreground">
+                                          IMG
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                }
+
+                                return (
+                                  <button
+                                    key={value.id}
+                                    type="button"
+                                    onClick={() => chooseOption(attribute.id, value.id)}
+                                    className={cn(
+                                      "rounded-full border px-3 py-1.5 text-xs transition",
+                                      isSelected
+                                        ? "border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-950/20"
+                                        : "border-border hover:bg-surface",
+                                    )}
+                                  >
+                                    {value.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {selectedVariant ? (
+                      <div className="space-y-2 rounded-lg border border-border bg-accent/5 p-3 text-sm">
+                        <div className="font-semibold">
+                          {Object.entries(selectedVariant.options || {}).map(([attrId, valId], index) => {
+                            const attr = viewProduct.attributes.find((a) => a.id === attrId);
+                            const val = attr?.values.find((x) => x.id === valId);
+                            if (!attr || !val) return null;
+                            return (
+                              <span key={attrId}>
+                                {index > 0 && " / "}
+                                {attr.name}: <span className="text-muted-foreground">{val.label}</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <div className="flex items-baseline gap-2 font-semibold">
+                          <span className="text-lg">{formatPrice(selectedVariant.cost_price ?? selectedVariant.price)}</span>
+                          {selectedVariant.cost_price != null && selectedVariant.cost_price !== selectedVariant.price && (
+                            <>
+                              <span className="text-md text-muted-foreground line-through">{formatPrice(selectedVariant.price)}</span>
+                              <span className="text-md font-bold text-destructive">
+                                -{Math.round(((selectedVariant.price - selectedVariant.cost_price) / selectedVariant.price) * 100)}%
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className={selectedVariant.stock === 0 ? "font-semibold text-destructive" : ""}>
+                          <div className="font-semibold">Stock :  <span className="text-muted-foreground">{selectedVariant.stock}</span></div>
+                        </div>
+                      </div>
+                    ) : isSelectionComplete ? (
+                      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                        Cette combinaison n'existe pas pour ce produit.
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="space-y-2 rounded-lg border border-border bg-accent/5 p-3 text-sm">
                     <div><span className="text-muted-foreground">Prix global : </span><span className="font-semibold">{formatPrice(displayPrice)}</span></div>
+                    {globalDiscountPercent !== null && (
+                      <div>
+                        <span className="text-muted-foreground">Après promotion : </span>
+                        <span className="font-semibold text-accent-strong">{formatPrice(globalPromoPrice)}</span>
+                        <span className="ml-2 rounded bg-accent-strong/10 px-2 py-0.5 text-xs font-bold text-accent-strong">
+                          {globalDiscountPercent > 0 ? `-${globalDiscountPercent}%` : `+${Math.abs(globalDiscountPercent)}%`}
+                        </span>
+                      </div>
+                    )}
                     {displayComparePrice && (
                       <div>
                         <span className="text-muted-foreground">Avant : </span>
@@ -789,16 +1131,6 @@ function AdminProducts() {
                   </div>
                 )}
 
-                {(viewProduct.short_description || viewProduct.description) && (
-                  <div className="space-y-1 text-sm">
-                    <h4 className="text-sm font-bold">Description</h4>
-                    {viewProduct.short_description && (
-                      <p className="text-muted-foreground">{viewProduct.short_description}</p>
-                    )}
-                    {viewProduct.description && <p>{viewProduct.description}</p>}
-                  </div>
-                )}
-
                 {viewProduct.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {viewProduct.tags.map((t) => (
@@ -806,13 +1138,25 @@ function AdminProducts() {
                     ))}
                   </div>
                 )}
+
+                
               </div>
+
+              {(viewProduct.short_description || viewProduct.description) && (
+                <div className="space-y-4 text-sm lg:col-span-2">
+                  <h4 className="font-bold text-foreground">Description</h4>
+                  {viewProduct.short_description && (
+                    <p className="text-muted-foreground">{viewProduct.short_description}</p>
+                  )}
+                  {viewProduct.description && <p className="text-foreground">{viewProduct.description}</p>}
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2 lg:col-span-2">
                 <Button variant="outline" onClick={() => setViewProduct(null)}>Fermer</Button>
                 <Button
                   variant="accent"
-                  onClick={() => { setDraft(viewProduct); setOpen(true); setViewProduct(null); }}
+                  onClick={() => { setDraft(viewProduct); setRemovedAttributeIds([]); setOpen(true); setViewProduct(null); setSelectedOptions({}); }}
                 >
                   Éditer
                 </Button>
@@ -955,6 +1299,7 @@ function AdminProducts() {
               setDraft={(p) => setDraft(p)}
               addAttribute={addAttribute}
               addValue={addValue}
+              removeValue={removeValue}
               addVariant={addVariant}
               updateAttribute={updateAttribute}
               removeAttribute={removeAttribute}
@@ -975,7 +1320,7 @@ function AdminProducts() {
               {isSaving ? (
                 <span className="inline-flex items-center gap-2">
                   <Spinner className="h-4 w-4" />
-                  Enregistrement...
+                  Modification...
                 </span>
               ) : (
                 draft.id ? "Modifier" : "Enregistrer"

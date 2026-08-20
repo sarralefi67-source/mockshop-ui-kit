@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, Menu, Phone, Search, ShoppingCart, User, X } from "lucide-react";
+import { Heart, Instagram, Menu, Phone, Search, ShoppingCart, User, X } from "lucide-react";
 import { useState } from "react";
 import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,29 @@ import { MegaMenu } from "./MegaMenu";
 
 const tree: CategoryNode[] = buildCategoryTree();
 
+// URLs des réseaux sociaux — à remplacer par vos vrais liens
+const SOCIAL_LINKS = {
+  instagram: "https://instagram.com/votre_compte",
+  tiktok: "https://www.tiktok.com/@votre_compte",
+  whatsapp: "https://wa.me/21671000000",
+};
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M16.5 3c.4 2.2 2 3.9 4.2 4.2v2.9c-1.5 0-2.9-.4-4.2-1.2v6.7a5.9 5.9 0 1 1-5.1-5.8v2.9a3 3 0 1 0 2.2 2.9V3h2.9Z" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1-.2.2-.6.8-.8 1-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5.1-.1.2-.3.4-.4.1-.1.2-.2.2-.4.1-.1 0-.3 0-.4-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9 0 1.1.8 2.2.9 2.4.1.2 1.6 2.5 3.9 3.5.5.2 1 .4 1.3.5.5.2 1 .1 1.4.1.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.2-.2-.4-.3Z" />
+    </svg>
+  );
+}
+
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
   const { user, profile, signOut } = useAuth();
@@ -26,34 +49,63 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 bg-card">
       <div className="bg-foreground text-background">
-        <div className="container-page flex h-9 items-center justify-between text-xs">
+        <div className="container-page relative flex h-9 items-center justify-center gap-2 text-xs">
           <p className="flex items-center gap-2">
             <Phone className="h-3.5 w-3.5" /> +216 71 000 000 — Livraison 24/48h
           </p>
-          <p className="hidden sm:block font-medium">Paiement à la livraison partout en Tunisie</p>
+          <p className="hidden font-medium sm:block">— Paiement à la livraison partout en Tunisie</p>
+
+          <div className="absolute right-4 hidden items-center gap-3 sm:flex">
+            <a
+              href={SOCIAL_LINKS.instagram}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Instagram"
+              className="text-background/80 transition-colors hover:text-background"
+            >
+              <Instagram className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={SOCIAL_LINKS.tiktok}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="TikTok"
+              className="text-background/80 transition-colors hover:text-background"
+            >
+              <TikTokIcon className="h-3.5 w-3.5" />
+            </a>
+            <a
+              href={SOCIAL_LINKS.whatsapp}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="WhatsApp"
+              className="text-background/80 transition-colors hover:text-background"
+            >
+              <WhatsAppIcon className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
       </div>
 
       <div className="border-b border-border">
-        <div className="container-page flex h-16 items-center gap-4">
-          <button
-            className="lg:hidden text-foreground"
-            aria-label="Ouvrir le menu"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+        <div className="container-page grid h-16 grid-cols-[auto_1fr_auto] items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden text-foreground"
+              aria-label="Ouvrir le menu"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </button>
 
-          {/* <Link to="/" className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-accent-strong text-lg font-black text-accent-strong-foreground">
-              N
-            </span>
-            <span className="text-lg font-extrabold tracking-tight">
-              Nexa<span className="text-accent-strong">Store</span>
-            </span>
-          </Link> */}
+            <Link to="/" className="flex items-center gap-2">
+              <span className="text-lg font-extrabold">
+                E_<span className="text-accent-strong">Commerce</span>
+              </span>
+            </Link>
+          </div>
 
-          <div className="relative ml-auto hidden max-w-xl flex-1 md:block">
+          <div className="relative mx-auto hidden w-full max-w-xl md:block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
@@ -96,7 +148,7 @@ export function Header() {
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <div className="flex items-center gap-1">
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="hidden sm:block text-sm font-medium">{profile?.first_name ?? user.email}</span>
