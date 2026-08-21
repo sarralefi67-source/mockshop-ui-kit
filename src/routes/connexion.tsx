@@ -13,10 +13,10 @@ export const Route = createFileRoute("/connexion")({
     typeof search["redirect"] === "string" ? { redirect: search["redirect"] } : {},
   head: () => ({
     meta: [
-      { title: "Connexion — Yadawi" },
-      { name: "description", content: "Connectez-vous à votre compte Yadawi pour suivre vos commandes et vos favoris." },
-      { property: "og:title", content: "Connexion — Yadawi" },
-      { property: "og:description", content: "Accédez à votre espace client Yadawi." },
+      { title: "Connexion : Artisanat" },
+      { name: "description", content: "Connectez-vous à votre compte Artisanat pour suivre vos commandes et vos favoris." },
+      { property: "og:title", content: "Connexion : Artisanat" },
+      { property: "og:description", content: "Accédez à votre espace client Artisanat." },
     ],
   }),
   component: LoginPage,

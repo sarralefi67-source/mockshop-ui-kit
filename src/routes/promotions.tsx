@@ -9,9 +9,9 @@ import type { Product } from "@/types";
 export const Route = createFileRoute("/promotions")({
   head: () => ({
     meta: [
-      { title: "Promotions en cours — Yadawi" },
+      { title: "Promotions en cours : Artisanat" },
       { name: "description", content: "Toutes nos offres du moment sur l'informatique, la téléphonie et la maison." },
-      { property: "og:title", content: "Promotions en cours — Yadawi" },
+      { property: "og:title", content: "Promotions en cours : Artisanat" },
       { property: "og:description", content: "Jusqu'à -40% sur une sélection de produits, paiement à la livraison." },
     ],
   }),

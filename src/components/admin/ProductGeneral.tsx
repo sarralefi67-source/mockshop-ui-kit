@@ -10,33 +10,42 @@ export default function ProductGeneral({
   draft,
   setDraft,
   categoriesMap,
+  showRequiredErrors,
 }: {
   draft: Product;
   setDraft: (p: Product) => void;
   categoriesMap: Record<string, string>;
+  showRequiredErrors: boolean;
 }) {
   return (
     <div className="grid gap-4 pt-5 sm:grid-cols-2">
       <div className="space-y-2 sm:col-span-2">
-        <Label>Nom</Label>
+        <Label htmlFor="product-name">Nom *</Label>
         <Input
+          id="product-name"
           required
           autoFocus
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
+        {showRequiredErrors && !draft.name.trim() && (
+          <p className="text-xs text-destructive">Le nom est obligatoire.</p>
+        )}
       </div>
      
       <div className="space-y-2">
-        <Label>Catégorie</Label>
-        <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <Label htmlFor="product-category">Catégorie *</Label>
+          <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
+            <SelectTrigger id="product-category"><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
           <SelectContent className="max-h-72">
             {Object.entries(categoriesMap).map(([id, name]) => (
               <SelectItem key={id} value={id}>{name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+          {showRequiredErrors && !draft.category_id && (
+            <p className="text-xs text-destructive">La catégorie est obligatoire.</p>
+          )}
        
       </div>
        <div className="space-y-2">
@@ -78,8 +87,17 @@ export default function ProductGeneral({
         <Input value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} placeholder="auto" />
       </div> */}
       <div className="space-y-2 sm:col-span-2">
-        <Label>Description courte</Label>
-        <Input value={draft.short_description} onChange={(e) => setDraft({ ...draft, short_description: e.target.value })} />
+        <Label htmlFor="product-short-description">Description courte *</Label>
+        <Input
+          id="product-short-description"
+          name="short_description"
+          required
+          value={draft.short_description}
+          onChange={(e) => setDraft({ ...draft, short_description: e.target.value })}
+        />
+        {showRequiredErrors && !draft.short_description.trim() && (
+          <p className="text-xs text-destructive">La description courte est obligatoire.</p>
+        )}
       </div>
       <div className="space-y-2 sm:col-span-2">
         <Label>Description</Label>

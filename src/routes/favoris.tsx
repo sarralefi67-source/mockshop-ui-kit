@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/favoris")({
   head: () => ({
     meta: [
-      { title: "Mes favoris — Yadawi" },
+      { title: "Mes favoris : Artisanat" },
       { name: "description", content: "Retrouvez les produits que vous avez enregistrés dans votre liste d'envies." },
-      { property: "og:title", content: "Mes favoris — Yadawi" },
-      { property: "og:description", content: "Votre liste d'envies Yadawi." },
+      { property: "og:title", content: "Mes favoris : Artisanat" },
+      { property: "og:description", content: "Votre liste d'envies Artisanat." },
     ],
   }),
   component: FavorisPage,

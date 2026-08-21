@@ -47,10 +47,10 @@ export const Route = createFileRoute("/produit/$slug")({
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
-      return { meta: [{ title: "Produit indisponible — Yadawi" }, { name: "robots", content: "noindex" }] };
+      return { meta: [{ title: "Produit indisponible : Artisanat" }, { name: "robots", content: "noindex" }] };
     }
     const { product } = loaderData;
-    const title = `${product.name} — Yadawi`;
+    const title = `${product.name} : Artisanat`;
     return {
       meta: [
         { title },

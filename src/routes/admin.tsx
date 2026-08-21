@@ -14,10 +14,10 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Back-office — Yadawi" },
-      { name: "description", content: "Administration Yadawi : catalogue, promotions et commandes." },
-      { property: "og:title", content: "Back-office — Yadawi" },
-      { property: "og:description", content: "Interface d'administration de la boutique Yadawi." },
+      { title: "Back-office — Artisanat" },
+      { name: "description", content: "Administration Artisanat : catalogue, promotions et commandes." },
+      { property: "og:title", content: "Back-office — Artisanat" },
+      { property: "og:description", content: "Interface d'administration de la boutique Artisanat." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -143,7 +143,7 @@ function AdminLayout() {
       >
         <div className="relative flex h-16 items-center gap-2 border-b border-border px-5">
           <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-lg font-extrabold">
-            Yada<span className="text-accent-strong">wi</span>
+            Arti<span className="text-accent-strong">sanat</span>
           </span>
           <button className="ml-auto lg:hidden" onClick={() => setOpen(false)} aria-label="Fermer">
             <ChevronLeft className="h-5 w-5" />

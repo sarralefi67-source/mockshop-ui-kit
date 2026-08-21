@@ -124,7 +124,7 @@ export function Header() {
 
             <Link to="/" className="flex items-center gap-2">
               <span className="text-lg font-extrabold">
-                Yada<span className="text-accent-strong">wi</span>
+                Arti<span className="text-accent-strong">sanat</span>
               </span>
             </Link>
           </div>

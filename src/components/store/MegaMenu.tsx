@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buildCategoryTree } from "@/data/categories";
-import { fetchCategories } from "@/lib/catalog";
+import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import type { CategoryNode } from "@/types";
 
@@ -12,9 +12,24 @@ export function MegaMenu() {
 
   useEffect(() => {
     let mounted = true;
-    fetchCategories()
-      .then((data) => {
-        if (mounted) setTree(buildCategoryTree(data));
+    Promise.all([fetchCategories(), fetchActiveProducts()])
+      .then(([categories, products]) => {
+        const categoriesById = new Map(categories.map((category) => [category.id, category]));
+        const visibleCategoryIds = new Set<string>();
+
+        products.forEach((product) => {
+          let categoryId = product.category_id;
+          while (categoryId) {
+            visibleCategoryIds.add(categoryId);
+            categoryId = categoriesById.get(categoryId)?.parent_id ?? null;
+          }
+        });
+
+        const filterTree = (nodes: CategoryNode[]): CategoryNode[] => nodes
+          .filter((node) => visibleCategoryIds.has(node.id))
+          .map((node) => ({ ...node, children: filterTree(node.children) }));
+
+        if (mounted) setTree(filterTree(buildCategoryTree(categories)));
       })
       .catch((err) => console.error("load mega menu categories", err));
     return () => {
@@ -22,23 +37,26 @@ export function MegaMenu() {
     };
   }, []);
 
+  const visibleCategories = tree.slice(0, 8);
+  const remainingCategories = tree.slice(8);
+
   return (
     <nav className="relative hidden lg:block border-t border-border bg-card">
       <div className="container-page flex items-center gap-1" onMouseLeave={() => setOpen(null)}>
-        {tree.map((cat: CategoryNode) => (
+        {visibleCategories.map((cat: CategoryNode) => (
           <div key={cat.id} className="static">
             <Link
               to="/categorie/$slug"
               params={{ slug: cat.slug }}
               onMouseEnter={() => setOpen(cat.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors",
+                "flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold transition-colors",
                 open === cat.id ? "text-accent-strong" : "text-foreground hover:text-accent-strong",
               )}
             >
-              {cat.image_url && (
+              {/* {cat.image_url && (
                 <img src={cat.image_url} alt="" className="h-6 w-6 rounded-full object-cover" />
-              )}
+              )} */}
               {cat.name}
               {cat.children.length > 0 && <ChevronDown className="h-3.5 w-3.5" />}
             </Link>
@@ -109,6 +127,39 @@ export function MegaMenu() {
             )}
           </div>
         ))}
+        {remainingCategories.length > 0 && (
+          <div className="static">
+            <button
+              type="button"
+              onMouseEnter={() => setOpen("more")}
+              aria-label="Voir les autres catégories"
+              className={cn(
+                "flex items-center gap-1 px-4 py-3 text-sm font-semibold transition-colors",
+                open === "more" ? "text-accent-strong" : "text-foreground hover:text-accent-strong",
+              )}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+            {open === "more" && (
+              <div className="absolute inset-x-0 top-full z-40 border-b border-border bg-card shadow-pop">
+                <div className="container-page grid grid-cols-4 gap-4 py-5">
+                  {remainingCategories.map((cat: CategoryNode) => (
+                    <Link
+                      key={cat.id}
+                      to="/categorie/$slug"
+                      params={{ slug: cat.slug }}
+                      onClick={() => setOpen(null)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground hover:text-accent-strong"
+                    >
+                      {cat.name}
+                      {cat.children.length > 0 && <ChevronDown className="h-3.5 w-3.5" />}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <Link
           to="/promotions"
           className="ml-auto px-4 py-3 text-sm font-semibold text-accent-strong hover:underline"

@@ -28,9 +28,9 @@ export const Route = createFileRoute("/categorie/$slug")({
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
-      return { meta: [{ title: "Catégorie introuvable — Yadawi" }, { name: "robots", content: "noindex" }] };
+      return { meta: [{ title: "Catégorie introuvable — Artisanat" }, { name: "robots", content: "noindex" }] };
     }
-    const title = `${loaderData.name} — Yadawi`;
+    const title = `${loaderData.name} — Artisanat`;
     const description =
       loaderData.description || `Tous nos produits ${loaderData.name} en Tunisie, paiement à la livraison.`;
     return {

@@ -1033,6 +1033,7 @@ export type ProductImage = {
   position: number
   is_main?: boolean
   variant_value: string | null
+  file?: File
 }
 
 export type ProductAttribute = {

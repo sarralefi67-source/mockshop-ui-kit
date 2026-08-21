@@ -89,6 +89,7 @@ function AdminProducts() {
   useEffect(() => { fetchProducts(); }, []);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [draft, setDraft] = useState<Product>(emptyProduct);
   const [removedAttributeIds, setRemovedAttributeIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -276,8 +277,20 @@ function AdminProducts() {
 
   const save = async () => {
     if (isSaving) return;
+    setShowRequiredErrors(true);
     if (!draft.name.trim()) {
       toast.error("Le nom du produit est obligatoire.");
+      document.querySelector<HTMLInputElement>("input[autoFocus]")?.focus();
+      return;
+    }
+    if (!draft.short_description.trim()) {
+      toast.error("La description courte est obligatoire.");
+      document.getElementById("product-short-description")?.focus();
+      return;
+    }
+    if (!draft.category_id) {
+      toast.error("La catégorie est obligatoire.");
+      document.getElementById("product-category")?.focus();
       return;
     }
     const slug = draft.slug.trim() || draft.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -296,8 +309,8 @@ function AdminProducts() {
         name: draft.name,
         slug,
         brand: draft.brand || null,
-        category_id: draft.category_id || null,
-        short_description: draft.short_description || null,
+        category_id: draft.category_id,
+        short_description: draft.short_description.trim(),
         description: draft.description || null,
         base_price: computedBasePrice,
         sku: draft.sku || `SKU-${Date.now()}`,
@@ -422,18 +435,7 @@ function AdminProducts() {
         }
       }
 
-      // ---- 3) images associées à une valeur d'attribut ----
-      for (const img of draft.images) {
-        if (!img.id) continue;
-        const mappedVariantValue = img.variant_value ? (oldValueIdToNewValueId[img.variant_value] ?? img.variant_value) : null;
-        const { error: imgLinkErr } = await supabase
-          .from("product_images")
-          .update({ variant_value: mappedVariantValue })
-          .eq("id", img.id);
-        if (imgLinkErr) throw imgLinkErr;
-      }
-
-      // ---- 4) variantes ----
+      // ---- 3) variantes ----
       const { data: existingVariantsRows } = await supabase.from("product_variants").select("id").eq("product_id", productId);
       const existingVariantIds = (existingVariantsRows ?? []).map((e: any) => e.id);
       const keptVariantIds: string[] = [];
@@ -481,6 +483,70 @@ function AdminProducts() {
       if (toDeleteVariants.length) {
         const { error } = await supabase.from("product_variants").delete().in("id", toDeleteVariants);
         if (error) throw error;
+      }
+
+      // ---- 4) images : upload et associations au clic sur Enregistrer ----
+      const { data: existingImageRows, error: existingImagesError } = await supabase
+        .from("product_images")
+        .select("id,url")
+        .eq("product_id", productId);
+      if (existingImagesError) throw existingImagesError;
+
+      const keptImageIds: string[] = [];
+      for (const [i, image] of draft.images.entries()) {
+        const mappedVariantValue = image.variant_value
+          ? (oldValueIdToNewValueId[image.variant_value] ?? image.variant_value)
+          : null;
+        const imagePayload = {
+          product_id: productId,
+          url: image.url,
+          position: i,
+          is_main: image.is_main ?? i === 0,
+          variant_value: mappedVariantValue,
+        };
+
+        const isPendingImage = Boolean(image.file) || image.id.startsWith("img-");
+        if (isPendingImage) {
+          if (!image.file) {
+            throw new Error("Cette image locale doit être sélectionnée à nouveau avant l'enregistrement.");
+          }
+          const rawName = image.file.name.replace(/\s+/g, "_");
+          const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, "");
+          const path = `${productId}/${Date.now()}-${safeName}`;
+          const publicUrl = await uploadToBucket("products", path, image.file);
+          const { data: insertedImage, error: insertImageError } = await supabase
+            .from("product_images")
+            .insert({ ...imagePayload, url: publicUrl } as any)
+            .select("id")
+            .single();
+          if (insertImageError) throw insertImageError;
+          keptImageIds.push(insertedImage.id);
+          URL.revokeObjectURL(image.url);
+        } else if (!image.id.startsWith("img-")) {
+          const { error: updateImageError } = await supabase
+            .from("product_images")
+            .update({ position: i, is_main: imagePayload.is_main, variant_value: mappedVariantValue } as any)
+            .eq("id", image.id)
+            .eq("product_id", productId);
+          if (updateImageError) throw updateImageError;
+          keptImageIds.push(image.id);
+        } else {
+          throw new Error("Une image sélectionnée est introuvable. Veuillez la sélectionner à nouveau.");
+        }
+      }
+
+      const removedImageRows = (existingImageRows ?? []).filter((row: any) => !keptImageIds.includes(row.id));
+      for (const image of removedImageRows) {
+        const { error: deleteImageError } = await supabase.from("product_images").delete().eq("id", image.id);
+        if (deleteImageError) throw deleteImageError;
+        const match = String(image.url ?? "").match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+        if (match) {
+          try {
+            await deleteFromBucket(match[1]!, decodeURIComponent(match[2]!));
+          } catch (storageError) {
+            console.warn("failed to delete removed product image", storageError);
+          }
+        }
       }
 
       toast.success(draft.id ? "Produit mis à jour." : "Produit créé.");
@@ -650,7 +716,7 @@ function AdminProducts() {
             <Button variant="ghost" onClick={refresh} title="Rafraîchir" style={{ border: "1px solid", borderColor: "hsl(240, 3.7%, 15.9%)" }}>
               ↻
             </Button>
-              <Button variant="accent" onClick={() => { setDraft(emptyProduct); setRemovedAttributeIds([]); setOpen(true); }}>
+              <Button variant="accent" onClick={() => { setDraft(emptyProduct); setRemovedAttributeIds([]); setShowRequiredErrors(false); setOpen(true); }}>
               <Plus className="h-4 w-4" /> Nouveau produit
             </Button>
           </div>
@@ -749,7 +815,7 @@ function AdminProducts() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                          <Button size="sm" variant="ghost" onClick={() => { setDraft(p); setRemovedAttributeIds([]); setOpen(true); }}>
+                          <Button size="sm" variant="ghost" onClick={() => { setDraft(p); setRemovedAttributeIds([]); setShowRequiredErrors(false); setOpen(true); }}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setConfirmDeleteId(p.id)}>
@@ -1156,7 +1222,7 @@ function AdminProducts() {
                 <Button variant="outline" onClick={() => setViewProduct(null)}>Fermer</Button>
                 <Button
                   variant="accent"
-                  onClick={() => { setDraft(viewProduct); setRemovedAttributeIds([]); setOpen(true); setViewProduct(null); setSelectedOptions({}); }}
+                  onClick={() => { setDraft(viewProduct); setRemovedAttributeIds([]); setShowRequiredErrors(false); setOpen(true); setViewProduct(null); setSelectedOptions({}); }}
                 >
                   Éditer
                 </Button>
@@ -1290,7 +1356,12 @@ function AdminProducts() {
           </TabsList>
 
           <TabsContent value="general">
-            <ProductGeneral draft={draft} setDraft={(p) => setDraft(p)} categoriesMap={categoriesMap} />
+            <ProductGeneral
+              draft={draft}
+              setDraft={(p) => setDraft(p)}
+              categoriesMap={categoriesMap}
+              showRequiredErrors={showRequiredErrors}
+            />
           </TabsContent>
 
           <TabsContent value="variantes">

@@ -34,9 +34,9 @@ function generateIdempotencyKey(): string {
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
-      { title: "Commande — Paiement à la livraison | Yadawi" },
-      { name: "description", content: "Finalisez votre commande Yadawi : adresse de livraison, code promo et paiement à la livraison." },
-      { property: "og:title", content: "Commande — Yadawi" },
+      { title: "Commande — Paiement à la livraison | Artisanat" },
+      { name: "description", content: "Finalisez votre commande Artisanat : adresse de livraison, code promo et paiement à la livraison." },
+      { property: "og:title", content: "Commande — Artisanat" },
       { property: "og:description", content: "Paiement à la livraison partout en Tunisie." },
       { name: "robots", content: "noindex" },
     ],

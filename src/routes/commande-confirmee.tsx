@@ -9,10 +9,10 @@ export const Route = createFileRoute("/commande-confirmee")({
   }),
   head: () => ({
     meta: [
-      { title: "Commande confirmée — Yadawi" },
+      { title: "Commande confirmée : Artisanat" },
       { name: "description", content: "Votre commande a bien été enregistrée. Paiement à la livraison." },
-      { property: "og:title", content: "Commande confirmée — Yadawi" },
-      { property: "og:description", content: "Merci pour votre commande Yadawi." },
+      { property: "og:title", content: "Commande confirmée : Artisanat" },
+      { property: "og:description", content: "Merci pour votre commande Artisanat." },
       { name: "robots", content: "noindex" },
     ],
   }),

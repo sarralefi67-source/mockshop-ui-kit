@@ -13,10 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 export const Route = createFileRoute("/inscription")({
   head: () => ({
     meta: [
-      { title: "Créer un compte — Yadawi" },
-      { name: "description", content: "Créez votre compte Yadawi pour commander plus vite et suivre vos livraisons." },
-      { property: "og:title", content: "Créer un compte — Yadawi" },
-      { property: "og:description", content: "Inscription gratuite à l'espace client Yadawi." },
+      { title: "Créer un compte : Artisanat" },
+      { name: "description", content: "Créez votre compte Artisanat pour commander plus vite et suivre vos livraisons." },
+      { property: "og:title", content: "Créer un compte : Artisanat" },
+      { property: "og:description", content: "Inscription gratuite à l'espace client Artisanat." },
     ],
   }),
   component: RegisterPage,

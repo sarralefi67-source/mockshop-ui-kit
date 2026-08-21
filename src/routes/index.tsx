@@ -15,13 +15,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Yadawi — High-tech, maison & accessoires en Tunisie" },
+      { title: "Artisanat — High-tech, maison & accessoires en Tunisie" },
       {
         name: "description",
         content:
           "Découvrez nos PC, smartphones, audio et électroménager. Livraison 24/48h et paiement à la livraison partout en Tunisie.",
       },
-      { property: "og:title", content: "Yadawi — High-tech & maison en Tunisie" },
+      { property: "og:title", content: "Artisanat : High-tech & maison en Tunisie" },
       {
         property: "og:description",
         content: "PC, smartphones, audio, électroménager. Paiement à la livraison.",
