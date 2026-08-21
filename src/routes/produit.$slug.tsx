@@ -331,7 +331,7 @@ function ProductPage() {
             <p className="mt-4 text-muted-foreground">{product.short_description}</p>
 
             <div className="mt-6 flex items-baseline gap-3">
-              <span className={cn("text-3xl font-extrabold", onSale ? "text-accent-strong" : "")}>
+              <span className={cn("text-3xl font-extrabold", onSale ? "text-destructive" : "")}>
                 {formatPrice(price)}
               </span>
               {onSale && (
@@ -339,7 +339,7 @@ function ProductPage() {
                   <span className="text-lg text-muted-foreground line-through">
                     {formatPrice(compareAt!)}
                   </span>
-                  <span className="rounded bg-accent-strong/10 px-2 py-0.5 text-sm font-bold text-accent-strong">
+                  <span className="rounded bg-destructive/10 px-2 py-0.5 text-sm font-bold text-destructive">
                     -{Math.round(((compareAt! - price) / compareAt!) * 100)}%
                   </span>
                 </>

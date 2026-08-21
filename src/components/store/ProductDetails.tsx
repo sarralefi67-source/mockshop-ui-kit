@@ -23,7 +23,7 @@ export function ProductDetails({
       <div className="relative">
         <div className="absolute left-0 -top-6 z-10 flex flex-col gap-1">
           {isOnSale(product) && (
-            <span className="rounded bg-accent-strong px-2 py-0.5 text-[11px] font-bold text-accent-strong-foreground">
+            <span className="rounded bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
               -{discountPercent(product)}%
             </span>
           )}
@@ -51,7 +51,7 @@ export function ProductDetails({
       <p className="mt-4 text-muted-foreground">{product.short_description}</p>
 
       <div className="mt-6 flex items-baseline gap-3">
-        <span className={"text-3xl font-extrabold " + (isOnSale(product) ? "text-accent-strong" : "")}>{formatPrice(product.price)}</span>
+        <span className={"text-3xl font-extrabold " + (isOnSale(product) ? "text-destructive" : "")}>{formatPrice(product.price)}</span>
         {product.compare_at_price && (
           <span className="text-lg text-muted-foreground line-through">{formatPrice(product.compare_at_price)}</span>
         )}

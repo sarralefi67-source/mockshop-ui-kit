@@ -108,9 +108,7 @@ function HomePage() {
                 );
                 return (
                   <CarouselItem key={banner.id}>
-                    {banner.link_url ? (
-                      <a href={banner.link_url} className="block">{slide}</a>
-                    ) : slide}
+                    <a href="/promotions" className="block">{slide}</a>
                   </CarouselItem>
                 );
               })}

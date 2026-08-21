@@ -12,6 +12,28 @@ create table if not exists public.banners (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.banner_products (
+  banner_id uuid not null references public.banners(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
+  position integer not null default 0,
+  primary key (banner_id, product_id)
+);
+
+alter table public.banner_products enable row level security;
+
+create policy "public read banner products"
+on public.banner_products
+for select
+to public
+using (true);
+
+create policy "admin full access banner products"
+on public.banner_products
+for all
+to public
+using (public.is_admin())
+with check (public.is_admin());
+
 alter table public.banners enable row level security;
 
 create policy "public read active banners"

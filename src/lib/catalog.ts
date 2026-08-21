@@ -75,8 +75,11 @@ function mapProductRow(row: any, promoByProduct: PromoMap, reviewStats: ReviewSt
 
   const promo = promoByProduct.get(row.id);
   const basePrice = Number(row.base_price ?? 0);
-  const price = applyDiscount(basePrice, promo);
-  const compareAtPrice = promo ? basePrice : null;
+  const calculatedPromoPrice = row.cost_price == null ? null : Number(row.cost_price);
+  const price = calculatedPromoPrice != null && calculatedPromoPrice < basePrice
+    ? calculatedPromoPrice
+    : applyDiscount(basePrice, promo);
+  const compareAtPrice = price < basePrice ? basePrice : null;
 
   const variants: ProductVariant[] = (row.product_variants ?? [])
     .filter((v: any) => v.is_active !== false)
@@ -89,14 +92,18 @@ function mapProductRow(row: any, promoByProduct: PromoMap, reviewStats: ReviewSt
         if (av?.attribute_id) options[av.attribute_id] = av.id;
       });
       const variantBase = Number(v.price ?? basePrice);
-      const variantPrice = applyDiscount(variantBase, promo);
+      const calculatedPromoPrice = v.cost_price == null ? null : Number(v.cost_price);
+      const variantPrice = calculatedPromoPrice != null && calculatedPromoPrice < variantBase
+        ? calculatedPromoPrice
+        : applyDiscount(variantBase, promo);
       return {
         id: v.id,
         product_id: v.product_id,
         sku: v.sku ?? "",
         options,
         price: variantPrice,
-        compare_at_price: promo ? variantBase : (v.compare_at_price ?? null),
+        cost_price: variantPrice < variantBase ? variantPrice : null,
+        compare_at_price: variantPrice < variantBase ? variantBase : (v.compare_at_price ?? null),
         stock: v.stock_quantity ?? 0,
         position: v.position ?? 0,
       };
@@ -113,6 +120,7 @@ function mapProductRow(row: any, promoByProduct: PromoMap, reviewStats: ReviewSt
     short_description: row.short_description ?? "",
     description: row.description ?? "",
     price,
+    cost_price: price < basePrice ? price : null,
     compare_at_price: compareAtPrice,
     stock: row.stock_quantity ?? 0,
     sku: row.sku ?? "",

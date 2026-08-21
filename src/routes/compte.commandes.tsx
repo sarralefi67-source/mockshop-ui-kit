@@ -35,7 +35,7 @@ function AccountOrders() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          `id, order_number, status, payment_method, subtotal, discount_amount, shipping_amount, total, shipping_address, created_at, order_items(*)`
+          `id, order_number, status, payment_method, subtotal, discount_amount, shipping_amount, total, shipping_address, created_at, order_items(*, products(product_images(url, is_main, position)))`
         )
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
@@ -67,7 +67,12 @@ function AccountOrders() {
           variant_id: it.variant_id,
           name: it.product_name,
           variant_label: it.variant_label ?? null,
-          image: mockImage(it.product_name ?? "Produit"),
+          image: (() => {
+            const images = (it.products?.product_images ?? []).slice().sort(
+              (a: any, b: any) => Number(b.is_main) - Number(a.is_main) || (a.position ?? 0) - (b.position ?? 0),
+            );
+            return images[0]?.url ?? mockImage(it.product_name ?? "Produit");
+          })(),
           unit_price: Number(it.unit_price ?? 0),
           quantity: Number(it.quantity ?? 1),
         })),

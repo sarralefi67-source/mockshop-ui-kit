@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import Spinner from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -19,19 +20,29 @@ export const Route = createFileRoute("/admin/banners")({
 });
 
 type BannerRow = Database["public"]["Tables"]["banners"]["Row"];
+type BannerDraft = Partial<BannerRow> & { product_ids?: string[] };
 
-const emptyBanner: Partial<BannerRow> = {
+const bannerLink = (title: string | null | undefined, productIds: string[] = [], products: { id: string; slug?: string | null }[] = []) => {
+  const selectedProduct = products.find((product) => product.id === productIds[0]);
+  if (selectedProduct?.slug) return `/produit/${selectedProduct.slug}`;
+  return title?.trim() ? "/promotions" : "/promotions";
+};
+
+const emptyBanner: BannerDraft = {
   title: "",
   subtitle: "",
   image_url: "",
   link_url: "",
   is_active: true,
+  product_ids: [],
 };
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState<BannerRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [draft, setDraft] = useState<Partial<BannerRow> | null>(null);
+  const [draft, setDraft] = useState<BannerDraft | null>(null);
+  const [products, setProducts] = useState<{ id: string; sku: string | null; slug: string | null }[]>([]);
+  const [productSearch, setProductSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -42,6 +53,14 @@ export default function AdminBanners() {
       const { data, error } = await supabase.from("banners").select("*").order("position", { ascending: true });
       if (error) throw error;
       setBanners(data ?? []);
+      const { data: productRows, error: productsError } = await supabase
+        .from("products")
+        .select("id,sku,slug")
+        .eq("is_active", true)
+        .order("sku")
+        .limit(30);
+      if (productsError) throw productsError;
+      setProducts(productRows ?? []);
     } catch (err) {
       console.error("load banners", err);
       toast.error("Impossible de charger les bannières.");
@@ -66,18 +85,20 @@ export default function AdminBanners() {
         title: draft.title?.trim() || null,
         subtitle: draft.subtitle?.trim() || null,
         image_url: draft.image_url,
-        link_url: draft.link_url?.trim() || null,
+        link_url: bannerLink(draft.title, draft.product_ids, products),
         is_active: draft.is_active ?? true,
       };
       if (draft.id) {
         const { error } = await supabase.from("banners").update(payload).eq("id", draft.id);
         if (error) throw error;
         toast.success("Bannière mise à jour.");
-      } else {
-        const { error } = await supabase.from("banners").insert({ ...payload, position: banners.length });
+        } else {
+          const { data: created, error } = await supabase.from("banners").insert({ ...payload, position: banners.length }).select("id").single();
         if (error) throw error;
+          await saveBannerProducts(created.id, draft.product_ids ?? []);
         toast.success("Bannière créée.");
       }
+        if (draft.id) await saveBannerProducts(draft.id, draft.product_ids ?? []);
       setDraft(null);
       await load();
     } catch (err) {
@@ -86,6 +107,27 @@ export default function AdminBanners() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveBannerProducts = async (bannerId: string, productIds: string[]) => {
+    const bannerProducts = supabase.from("banner_products" as never) as any;
+    const { error: deleteError } = await bannerProducts.delete().eq("banner_id", bannerId);
+    if (deleteError) throw deleteError;
+    if (productIds.length === 0) return;
+    const { error: insertError } = await bannerProducts.insert(
+      productIds.map((productId, position) => ({ banner_id: bannerId, product_id: productId, position })),
+    );
+    if (insertError) throw insertError;
+  };
+
+  const openBanner = async (banner: BannerRow | typeof emptyBanner) => {
+    if (!("id" in banner) || !banner.id) {
+      setDraft({ ...banner, product_ids: [] });
+      return;
+    }
+    const bannerProducts = supabase.from("banner_products" as never) as any;
+    const { data } = await bannerProducts.select("product_id").eq("banner_id", banner.id).order("position");
+    setDraft({ ...banner, product_ids: (data ?? []).map((row: { product_id: string }) => row.product_id) });
   };
 
   const handleUpload = async (file: File) => {
@@ -150,7 +192,7 @@ export default function AdminBanners() {
           <h1 className="text-2xl font-bold">Bannières</h1>
           <p className="text-sm text-muted-foreground">Gérez le carrousel affiché en haut de l'accueil.</p>
         </div>
-        <Button variant="accent" onClick={() => setDraft(emptyBanner)}>
+        <Button variant="accent" onClick={() => { setProductSearch(""); openBanner(emptyBanner); }}>
           <Plus className="h-4 w-4" /> Nouvelle bannière
         </Button>
       </div>
@@ -177,7 +219,7 @@ export default function AdminBanners() {
                   <div className="flex items-center gap-1">
                     <button disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" onClick={() => move(banner, -1)} aria-label="Monter">◀</button>
                     <button disabled={idx === arr.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" onClick={() => move(banner, 1)} aria-label="Descendre">▶</button>
-                    <button className="rounded p-1.5 text-muted-foreground hover:bg-surface" onClick={() => setDraft(banner)} aria-label="Modifier">
+                    <button className="rounded p-1.5 text-muted-foreground hover:bg-surface" onClick={() => { setProductSearch(""); openBanner(banner); }} aria-label="Modifier">
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button className="rounded p-1.5 text-destructive hover:bg-destructive/10" onClick={() => setConfirmDeleteId(banner.id)} aria-label="Supprimer">
@@ -232,8 +274,37 @@ export default function AdminBanners() {
                 <Input value={draft.subtitle ?? ""} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} placeholder="Découvrez nos pièces artisanales" />
               </div>
               <div className="space-y-2">
-                <Label>Lien (optionnel)</Label>
-                <Input value={draft.link_url ?? ""} onChange={(e) => setDraft({ ...draft, link_url: e.target.value })} placeholder="/categorie/poterie" />
+                <Label>Lien automatique</Label>
+                <Input value={bannerLink(draft.title, draft.product_ids, products)} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Produits associés</Label>
+                <Input
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Rechercher par SKU"
+                />
+                <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-border p-3">
+                  {products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun produit actif.</p>
+                  ) : products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).slice(0, 30).map((product) => {
+                    const checked = draft.product_ids?.includes(product.id) ?? false;
+                    return (
+                      <label key={product.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => setDraft({
+                            ...draft,
+                            product_ids: value
+                              ? [...(draft.product_ids ?? []), product.id]
+                              : (draft.product_ids ?? []).filter((id) => id !== product.id),
+                          })}
+                        />
+                        <span>{product.sku || "SKU non défini"}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <Switch checked={draft.is_active ?? true} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />

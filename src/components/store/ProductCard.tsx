@@ -34,7 +34,7 @@ export function ProductCard({ product }: { product: Product }) {
     <article className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow hover:shadow-card">
       <div className="absolute left-3 top-3 z-10 flex flex-col gap-1">
         {isOnSale(product) && (
-          <span className="rounded bg-accent-strong px-2 py-0.5 text-[11px] font-bold text-accent-strong-foreground">
+          <span className="rounded bg-destructive px-2 py-0.5 text-[11px] font-bold text-destructive-foreground">
             -{discountPercent(product)}%
           </span>
         )}
