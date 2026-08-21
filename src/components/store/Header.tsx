@@ -1,19 +1,17 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Heart, Instagram, Menu, Phone, Search, ShoppingCart, User, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
 import { buildCategoryTree } from "@/data/categories";
-import { searchProducts } from "@/data/products";
+import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
 import { formatPrice } from "@/lib/placeholder";
-import type { CategoryNode } from "@/types";
+import type { CategoryNode, Product } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MegaMenu } from "./MegaMenu";
-
-const tree: CategoryNode[] = buildCategoryTree();
 
 // URLs des réseaux sociaux — à remplacer par vos vrais liens
 const SOCIAL_LINKS = {
@@ -44,7 +42,33 @@ export function Header() {
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
-  const results = searchProducts(query).slice(0, 6);
+  const [tree, setTree] = useState<CategoryNode[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchCategories()
+      .then((data) => {
+        if (mounted) setTree(buildCategoryTree(data));
+      })
+      .catch((err) => console.error("load header categories", err));
+    fetchActiveProducts()
+      .then((data) => {
+        if (mounted) setProducts(data);
+      })
+      .catch((err) => console.error("load header search products", err));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return products
+      .filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [products, query]);
 
   return (
     <header className="sticky top-0 z-50 bg-card">
@@ -100,7 +124,7 @@ export function Header() {
 
             <Link to="/" className="flex items-center gap-2">
               <span className="text-lg font-extrabold">
-                E_<span className="text-accent-strong">Commerce</span>
+                Yada<span className="text-accent-strong">wi</span>
               </span>
             </Link>
           </div>

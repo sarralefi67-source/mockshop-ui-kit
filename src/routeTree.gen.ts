@@ -21,11 +21,13 @@ import { Route as InscriptionRouteImport } from './routes/inscription'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAvisRouteImport } from './routes/admin.avis'
+import { Route as AdminBannersRouteImport } from './routes/admin.banners'
 import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCommandesRouteImport } from './routes/admin.commandes'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminNewsletterRouteImport } from './routes/admin.newsletter'
+import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminParametresRouteImport } from './routes/admin.parametres'
 import { Route as AdminProduitsRouteImport } from './routes/admin.produits'
 import { Route as AdminPromotionsRouteImport } from './routes/admin.promotions'
@@ -96,6 +98,11 @@ const AdminAvisRoute = AdminAvisRouteImport.update({
   path: '/avis',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBannersRoute = AdminBannersRouteImport.update({
+  id: '/banners',
+  path: '/banners',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/categories',
   path: '/categories',
@@ -119,6 +126,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
 const AdminNewsletterRoute = AdminNewsletterRouteImport.update({
   id: '/newsletter',
   path: '/newsletter',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminParametresRoute = AdminParametresRouteImport.update({
@@ -179,11 +191,13 @@ export interface FileRoutesByFullPath {
   '/inscription': typeof InscriptionRoute
   '/promotions': typeof PromotionsRoute
   '/admin/avis': typeof AdminAvisRoute
+  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/newsletter': typeof AdminNewsletterRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -205,11 +219,13 @@ export interface FileRoutesByTo {
   '/inscription': typeof InscriptionRoute
   '/promotions': typeof PromotionsRoute
   '/admin/avis': typeof AdminAvisRoute
+  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/newsletter': typeof AdminNewsletterRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -234,11 +250,13 @@ export interface FileRoutesById {
   '/inscription': typeof InscriptionRoute
   '/promotions': typeof PromotionsRoute
   '/admin/avis': typeof AdminAvisRoute
+  '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/newsletter': typeof AdminNewsletterRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -264,11 +282,13 @@ export interface FileRouteTypes {
     | '/inscription'
     | '/promotions'
     | '/admin/avis'
+    | '/admin/banners'
     | '/admin/categories'
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
     | '/admin/newsletter'
+    | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
@@ -290,11 +310,13 @@ export interface FileRouteTypes {
     | '/inscription'
     | '/promotions'
     | '/admin/avis'
+    | '/admin/banners'
     | '/admin/categories'
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
     | '/admin/newsletter'
+    | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
@@ -318,11 +340,13 @@ export interface FileRouteTypes {
     | '/inscription'
     | '/promotions'
     | '/admin/avis'
+    | '/admin/banners'
     | '/admin/categories'
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
     | '/admin/newsletter'
+    | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
@@ -437,6 +461,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAvisRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/banners': {
+      id: '/admin/banners'
+      path: '/banners'
+      fullPath: '/admin/banners'
+      preLoaderRoute: typeof AdminBannersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/categories': {
       id: '/admin/categories'
       path: '/categories'
@@ -470,6 +501,13 @@ declare module '@tanstack/react-router' {
       path: '/newsletter'
       fullPath: '/admin/newsletter'
       preLoaderRoute: typeof AdminNewsletterRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/notifications': {
+      id: '/admin/notifications'
+      path: '/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/parametres': {
@@ -540,11 +578,13 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminAvisRoute: typeof AdminAvisRoute
+  AdminBannersRoute: typeof AdminBannersRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
   AdminClientsRoute: typeof AdminClientsRoute
   AdminCommandesRoute: typeof AdminCommandesRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminNewsletterRoute: typeof AdminNewsletterRoute
+  AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminParametresRoute: typeof AdminParametresRoute
   AdminProduitsRoute: typeof AdminProduitsRoute
   AdminPromotionsRoute: typeof AdminPromotionsRoute
@@ -553,11 +593,13 @@ interface AdminRouteChildren {
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAvisRoute: AdminAvisRoute,
+  AdminBannersRoute: AdminBannersRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
   AdminClientsRoute: AdminClientsRoute,
   AdminCommandesRoute: AdminCommandesRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminNewsletterRoute: AdminNewsletterRoute,
+  AdminNotificationsRoute: AdminNotificationsRoute,
   AdminParametresRoute: AdminParametresRoute,
   AdminProduitsRoute: AdminProduitsRoute,
   AdminPromotionsRoute: AdminPromotionsRoute,

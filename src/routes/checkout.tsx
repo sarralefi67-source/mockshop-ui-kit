@@ -1,28 +1,42 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { BadgePercent, Banknote, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { useStore } from "@/context/StoreContext";
+import { useAuth } from "@/context/AuthContext";
 import { GOVERNORATES } from "@/data/governorates";
 import { formatPrice } from "@/lib/placeholder";
 import { supabase } from "@/lib/supabaseClient";
+import type { Address } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
+// crypto.randomUUID() is only exposed in secure contexts (HTTPS / localhost)
+// — fall back to a plain random string elsewhere. Only needs to be unique,
+// not RFC4122-compliant (the DB column is just `text unique`).
+function generateIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `ord_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
 export const Route = createFileRoute("/checkout")({
   head: () => ({
     meta: [
-      { title: "Commande — Paiement à la livraison | NexaStore" },
-      { name: "description", content: "Finalisez votre commande NexaStore : adresse de livraison, code promo et paiement à la livraison." },
-      { property: "og:title", content: "Commande — NexaStore" },
+      { title: "Commande — Paiement à la livraison | Yadawi" },
+      { name: "description", content: "Finalisez votre commande Yadawi : adresse de livraison, code promo et paiement à la livraison." },
+      { property: "og:title", content: "Commande — Yadawi" },
       { property: "og:description", content: "Paiement à la livraison partout en Tunisie." },
       { name: "robots", content: "noindex" },
     ],
@@ -32,11 +46,100 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
+  const { user, profile, loading: authLoading } = useAuth();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [shippingRates, setShippingRates] = useState<Record<string, number>>({});
   const navigate = useNavigate();
+  const idempotencyKey = useRef(generateIdempotencyKey());
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [city, setCity] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [note, setNote] = useState("");
+
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
+  const applyAddress = (a: Address) => {
+    setPhone(a.phone);
+    setAddressLine(a.line1);
+    setCity(a.city);
+    setPostalCode(a.postal_code);
+    setGovernorate(a.governorate);
+  };
+
+  const startNewAddress = () => {
+    setSelectedAddressId(null);
+    setAddressLine("");
+    setCity("");
+    setPostalCode("");
+    setGovernorate("");
+  };
+
+  useEffect(() => {
+    if (profile) {
+      setFirstName((v) => v || profile.first_name || "");
+      setLastName((v) => v || profile.last_name || "");
+      setEmail((v) => v || profile.email || "");
+    }
+  }, [profile]);
+
+  // Smart checkout: pre-fill from the customer's saved address book (default
+  // first, else the most recently added) so a returning customer never has
+  // to retype it. First-time customers just get an empty, editable form —
+  // whatever they type there gets saved to their address book on order
+  // success (see handleSubmit), so next time it's here too.
+  useEffect(() => {
+    if (!user) return;
+    let mounted = true;
+    supabase
+      .from("addresses")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("is_default", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("load saved addresses", error);
+          return;
+        }
+        if (!mounted) return;
+        const list: Address[] = (data ?? []).map((row) => ({
+          id: row.id,
+          label: row.label,
+          full_name: row.full_name ?? "",
+          phone: row.phone ?? "",
+          line1: row.line1 ?? "",
+          city: row.city ?? "",
+          governorate: row.governorate ?? "",
+          postal_code: row.postal_code ?? "",
+          is_default: row.is_default ?? false,
+        }));
+        setSavedAddresses(list);
+        if (list.length > 0) {
+          const preferred = list.find((a) => a.is_default) ?? list[0]!;
+          applyAddress(preferred);
+          setSelectedAddressId(preferred.id);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // account required to checkout — send to login and back once signed in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate({ to: "/connexion", search: { redirect: "/checkout" } });
+    }
+  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -73,7 +176,7 @@ function CheckoutPage() {
   const shipping = items.length === 0 ? 0 : Number(shippingRates[governorate] ?? 0);
   const total = Math.max(0, subtotal - (coupon?.discount ?? 0)) + shipping;
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!governorate) {
       toast.error("Veuillez choisir un gouvernorat.");
@@ -83,14 +186,75 @@ function CheckoutPage() {
       toast.error("La livraison n'est pas disponible pour ce gouvernorat.");
       return;
     }
+    if (!phone.trim() || !addressLine.trim() || !city.trim()) {
+      toast.error("Veuillez compléter vos coordonnées et votre adresse.");
+      return;
+    }
+
     setSubmitting(true);
-    setTimeout(() => {
-      const reference = `CMD-2026-${Math.floor(2000 + Math.random() * 8000)}`;
+    try {
+      const { data, error } = await supabase.rpc("create_order", {
+        p_items: items.map((item) => ({
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          variant_label: item.variant_label,
+          quantity: item.quantity,
+        })),
+        p_governorate: governorate,
+        p_shipping_address: {
+          full_name: `${firstName} ${lastName}`.trim(),
+          phone: phone.trim(),
+          line1: addressLine.trim(),
+          city: city.trim(),
+          governorate,
+          postal_code: postalCode.trim() || null,
+        },
+        p_coupon_code: coupon?.code ?? null,
+        p_notes: note.trim() || null,
+        p_idempotency_key: idempotencyKey.current,
+      });
+
+      if (error) throw error;
+      const result = data as { id: string; order_number: string; total: number };
+
+      // first time this address is used (not picked from the saved book):
+      // persist it so it's pre-filled on the next order too
+      if (!selectedAddressId) {
+        supabase
+          .from("addresses")
+          .insert({
+            user_id: user!.id,
+            label: savedAddresses.length === 0 ? "Domicile" : "Adresse",
+            full_name: `${firstName} ${lastName}`.trim(),
+            phone: phone.trim(),
+            line1: addressLine.trim(),
+            city: city.trim(),
+            governorate,
+            postal_code: postalCode.trim() || null,
+            is_default: savedAddresses.length === 0,
+          })
+          .then(({ error: addrError }) => {
+            if (addrError) console.warn("save address to book failed", addrError);
+          });
+      }
+
       clearCart();
+      navigate({ to: "/commande-confirmee", search: { ref: result.order_number } });
+    } catch (err: any) {
+      console.error("create_order", err);
+      toast.error(err?.message ?? "Impossible de valider la commande. Réessayez.");
+    } finally {
       setSubmitting(false);
-      navigate({ to: "/commande-confirmee", search: { ref: reference } });
-    }, 900);
+    }
   };
+
+  if (authLoading || !user) {
+    return (
+      <StoreLayout>
+        <div className="container-page py-24 text-center text-muted-foreground">Redirection…</div>
+      </StoreLayout>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -121,33 +285,69 @@ function CheckoutPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="prenom">Prénom</Label>
-                  <Input id="prenom" required placeholder="Sarra" />
+                  <Input id="prenom" required placeholder="Sarra" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom</Label>
-                  <Input id="nom" required placeholder="Lefi" />
+                  <Input id="nom" required placeholder="Lefi" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tel">Téléphone</Label>
-                  <Input id="tel" required type="tel" placeholder="+216 22 000 000" />
+                  <Input id="tel" required type="tel" placeholder="+216 22 000 000" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mail">E-mail (optionnel)</Label>
-                  <Input id="mail" type="email" placeholder="vous@example.tn" />
+                  <Input id="mail" type="email" placeholder="vous@example.tn" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
               </div>
             </section>
 
             <section className="rounded-xl border border-border bg-card p-6">
               <h2 className="text-lg font-bold">Adresse de livraison</h2>
+
+              {savedAddresses.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {savedAddresses.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        applyAddress(a);
+                        setSelectedAddressId(a.id);
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        selectedAddressId === a.id
+                          ? "border-accent-strong bg-accent-strong/10 text-accent-strong"
+                          : "border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={startNewAddress}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      selectedAddressId === null
+                        ? "border-accent-strong bg-accent-strong/10 text-accent-strong"
+                        : "border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Plus className="h-3 w-3" /> Nouvelle adresse
+                  </button>
+                </div>
+              )}
+
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="adresse">Adresse</Label>
-                  <Input id="adresse" required placeholder="12 rue de la Liberté, Apt 4" />
+                  <Input id="adresse" required placeholder="12 rue de la Liberté, Apt 4" value={addressLine} onChange={(e) => setAddressLine(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ville">Ville</Label>
-                  <Input id="ville" required placeholder="Le Bardo" />
+                  <Input id="ville" required placeholder="Le Bardo" value={city} onChange={(e) => setCity(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="gov">Gouvernorat</Label>
@@ -162,11 +362,11 @@ function CheckoutPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cp">Code postal</Label>
-                  <Input id="cp" placeholder="2000" />
+                  <Input id="cp" placeholder="2000" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="note">Note pour le livreur (optionnel)</Label>
-                  <Textarea id="note" rows={3} placeholder="Étage, point de repère…" />
+                  <Textarea id="note" rows={3} placeholder="Étage, point de repère…" value={note} onChange={(e) => setNote(e.target.value)} />
                 </div>
               </div>
             </section>
@@ -238,13 +438,23 @@ function CheckoutPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
-                        const res = applyCoupon(code);
-                        res.ok ? toast.success(res.message) : toast.error(res.message);
-                        if (res.ok) setCode("");
+                      disabled={applyingCoupon || !code.trim()}
+                      onClick={async () => {
+                        setApplyingCoupon(true);
+                        try {
+                          const res = await applyCoupon(code);
+                          if (res.ok) {
+                            toast.success(res.message);
+                            setCode("");
+                          } else {
+                            toast.error(res.message);
+                          }
+                        } finally {
+                          setApplyingCoupon(false);
+                        }
                       }}
                     >
-                      Appliquer
+                      {applyingCoupon ? "…" : "Appliquer"}
                     </Button>
                   </div>
                 )}
@@ -275,9 +485,6 @@ function CheckoutPage() {
               <Button variant="accent" size="lg" type="submit" className="mt-5 w-full" disabled={submitting}>
                 {submitting ? "Traitement…" : "Confirmer la commande"}
               </Button>
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                Démo : aucune commande réelle n'est enregistrée.
-              </p>
             </div>
           </aside>
         </form>

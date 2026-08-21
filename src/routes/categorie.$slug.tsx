@@ -4,12 +4,12 @@ import { SlidersHorizontal } from "lucide-react";
 import { StoreLayout } from "@/components/store/StoreLayout";
 import { ProductCard, ProductCardSkeleton } from "@/components/store/ProductCard";
 import {
-  categories,
   categoryPath,
   categoryWithDescendants,
   findCategoryBySlug,
 } from "@/data/categories";
-import { products } from "@/data/products";
+import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
+import type { Category, Product } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
@@ -20,16 +20,17 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/categorie/$slug")({
-  loader: ({ params }) => {
-    const category = findCategoryBySlug(params.slug);
+  loader: async ({ params }) => {
+    const categories = await fetchCategories();
+    const category = findCategoryBySlug(params.slug, categories);
     if (!category) throw notFound();
-    return { name: category.name, description: category.description ?? "" };
+    return { name: category.name, description: category.description ?? "", categories };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
-      return { meta: [{ title: "Catégorie introuvable — NexaStore" }, { name: "robots", content: "noindex" }] };
+      return { meta: [{ title: "Catégorie introuvable — Yadawi" }, { name: "robots", content: "noindex" }] };
     }
-    const title = `${loaderData.name} — NexaStore`;
+    const title = `${loaderData.name} — Yadawi`;
     const description =
       loaderData.description || `Tous nos produits ${loaderData.name} en Tunisie, paiement à la livraison.`;
     return {
@@ -48,12 +49,38 @@ const PAGE_SIZE = 6;
 
 function CategoryPage() {
   const { slug } = Route.useParams();
-  const category = findCategoryBySlug(slug)!;
-  const ids = useMemo(() => categoryWithDescendants(category.id), [category.id]);
-  const path = categoryPath(category.id);
+  const { categories } = Route.useLoaderData();
+  const category = findCategoryBySlug(slug, categories)!;
+  const ids = useMemo(() => categoryWithDescendants(category.id, categories), [category.id, categories]);
+  const path = categoryPath(category.id, categories);
   const subCategories = categories.filter((c) => c.parent_id === category.id);
 
-  const base = useMemo(() => products.filter((p) => ids.includes(p.category_id)), [ids]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setPage(1);
+    fetchActiveProducts()
+      .then((data) => {
+        if (mounted) setAllProducts(data);
+      })
+      .catch((err) => {
+        console.error("load category products", err);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  const base = useMemo(
+    () => allProducts.filter((p) => p.category_id && ids.includes(p.category_id)),
+    [allProducts, ids],
+  );
   const maxPrice = Math.max(1000, ...base.map((p) => p.price));
 
   const [priceRange, setPriceRange] = useState<number[]>([0, maxPrice]);
@@ -62,15 +89,11 @@ function CategoryPage() {
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [sort, setSort] = useState("popularite");
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    setPage(1);
     setPriceRange([0, maxPrice]);
     setBrands([]);
-    const t = setTimeout(() => setLoading(false), 400);
-    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, maxPrice]);
 
   const availableBrands = [...new Set(base.map((p) => p.brand))];

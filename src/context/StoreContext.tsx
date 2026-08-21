@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CartItem } from "@/types";
-import { SHIPPING_FEE, coupons } from "@/data/coupons";
+import { SHIPPING_FEE } from "@/data/coupons";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -25,7 +25,7 @@ interface StoreContextValue {
   toggleWishlist: (productId: string) => void;
   isWishlisted: (productId: string) => boolean;
   coupon: AppliedCoupon | null;
-  applyCoupon: (code: string) => { ok: boolean; message: string };
+  applyCoupon: (code: string) => Promise<{ ok: boolean; message: string }>;
   removeCoupon: () => void;
 }
 
@@ -35,7 +35,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [wishlist, setWishlist] = useState<string[]>(["p-3", "p-9"]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
 
   const addItem = useCallback((item: Omit<CartItem, "key" | "quantity">, quantity = 1) => {
@@ -106,19 +106,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const total = Math.max(0, subtotal - discount) + shipping;
 
   const applyCoupon = useCallback(
-    (code: string) => {
-      const found = coupons.find(
-        (c) => c.code.toLowerCase() === code.trim().toLowerCase() && c.is_active,
-      );
-      if (!found) return { ok: false, message: "Code promo invalide ou expiré." };
+    async (code: string) => {
       const currentSubtotal = items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
-      if (currentSubtotal < found.min_amount) {
-        return { ok: false, message: `Minimum ${found.min_amount} DT d'achat requis.` };
+      const { data, error } = await supabase.rpc("validate_coupon", {
+        p_code: code.trim(),
+        p_subtotal: currentSubtotal,
+      });
+      if (error) {
+        console.error("validate_coupon", error);
+        return { ok: false, message: "Impossible de vérifier ce code pour le moment." };
+      }
+      const result = data as { ok: boolean; message?: string; code?: string; discount_type?: string; discount_value?: number };
+      if (!result.ok) {
+        return { ok: false, message: result.message ?? "Code promo invalide ou expiré." };
       }
       const value =
-        found.type === "percent" ? (currentSubtotal * found.value) / 100 : found.value;
-      setCoupon({ code: found.code, discount: Number(value.toFixed(3)) });
-      return { ok: true, message: `Code ${found.code} appliqué.` };
+        result.discount_type === "percentage"
+          ? (currentSubtotal * (result.discount_value ?? 0)) / 100
+          : (result.discount_value ?? 0);
+      setCoupon({ code: result.code!, discount: Number(value.toFixed(3)) });
+      return { ok: true, message: `Code ${result.code} appliqué.` };
     },
     [items],
   );
@@ -127,8 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     async function loadWishlist() {
       if (!profile) {
-        // keep default demo wishlist for guests
-        setWishlist((prev) => prev);
+        // guests: local-only wishlist (nothing to load from the DB)
         return;
       }
       const { data, error } = await supabase.from("wishlists").select("product_id").eq("user_id", profile.id);

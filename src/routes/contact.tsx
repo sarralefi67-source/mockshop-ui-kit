@@ -11,10 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
-      { title: "Contact — NexaStore" },
+      { title: "Contact — Yadawi" },
       { name: "description", content: "Une question sur une commande ou un produit ? Notre équipe vous répond 6j/7." },
-      { property: "og:title", content: "Contact — NexaStore" },
-      { property: "og:description", content: "Contactez le service client NexaStore." },
+      { property: "og:title", content: "Contact — Yadawi" },
+      { property: "og:description", content: "Contactez le service client Yadawi." },
     ],
   }),
   component: ContactPage,
@@ -33,7 +33,7 @@ function ContactPage() {
           </p>
           <ul className="mt-6 space-y-3 text-sm">
             <li className="flex items-center gap-3"><Phone className="h-4 w-4 text-accent-strong" /> +216 71 000 000</li>
-            <li className="flex items-center gap-3"><Mail className="h-4 w-4 text-accent-strong" /> contact@nexastore.tn</li>
+            <li className="flex items-center gap-3"><Mail className="h-4 w-4 text-accent-strong" /> contact@yadawi.tn</li>
             <li className="flex items-center gap-3"><MapPin className="h-4 w-4 text-accent-strong" /> Avenue Habib Bourguiba, Tunis</li>
           </ul>
         </div>

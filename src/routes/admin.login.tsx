@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
     meta: [
-      { title: "Admin Login — NexaStore" },
+      { title: "Admin Login — Yadawi" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/admin/login")({
 });
 
 function AdminLogin() {
-  const { signIn } = useAuth();
+  const { signIn, signOut } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,23 @@ function AdminLogin() {
         setLoading(false);
         return;
       }
+
+      // signIn() only proves valid credentials — this form is admin-only, so
+      // reject non-admin accounts here instead of flashing "Connecté" and
+      // relying on the /admin guard to kick them back out afterwards.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      const { data: profile } = userId
+        ? await supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+        : { data: null };
+
+      if (!profile || profile.role !== "admin") {
+        await signOut();
+        toast.error("Ce compte n'a pas accès à l'administration.");
+        setLoading(false);
+        return;
+      }
+
       toast.success("Connecté");
       // navigate back to admin root (AuthContext signIn triggers profile load)
       window.location.href = "/admin";

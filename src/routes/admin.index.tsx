@@ -106,7 +106,7 @@ function AdminDashboard() {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map(({ label, value, icon: Icon, delta }) => <div key={label} className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label}</span><Icon className="h-4 w-4 text-accent-strong" /></div>
-        <p className="mt-3 text-2xl font-extrabold">{kpisLoading ? <Spinner className="h-6 w-6" /> : value}</p>
+        <div className="mt-3 text-2xl font-extrabold">{kpisLoading ? <Spinner className="h-6 w-6" /> : value}</div>
         <p className={`mt-1 text-xs font-semibold ${delta !== null && delta < 0 ? "text-destructive" : "text-success"}`}>{delta === null ? "Pas de comparaison" : `${delta >= 0 ? "+" : ""}${delta.toFixed(2).replace(".", ",")}% vs mois précédent`}</p>
       </div>)}
     </div>

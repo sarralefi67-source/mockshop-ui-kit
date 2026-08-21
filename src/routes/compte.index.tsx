@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { currentCustomer } from "@/data/orders";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
@@ -15,11 +14,23 @@ export const Route = createFileRoute("/compte/")({
 
 function AccountInfo() {
   const { profile } = useAuth();
-  const [newsletter, setNewsletter] = useState(currentCustomer.newsletter);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [newsletter, setNewsletter] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pw1, setPw1] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    if (profile) setNewsletter(Boolean(profile.newsletter_opt_in));
+    if (!profile) return;
+    setFirstName(profile.first_name ?? "");
+    setLastName(profile.last_name ?? "");
+    setEmail(profile.email ?? "");
+    setPhone(profile.phone ?? "");
+    setNewsletter(Boolean(profile.newsletter_opt_in));
   }, [profile]);
 
   return (
@@ -33,19 +44,25 @@ function AccountInfo() {
         className="rounded-xl border border-border bg-card p-6"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (!profile) return;
           setSaving(true);
           try {
-            if (profile) {
-              const { error } = await supabase.from("profiles").update({ newsletter_opt_in: newsletter }).eq("id", profile.id);
-              if (error) throw error;
-              if (newsletter) {
-                // ensure newsletter_subscribers contains email
-                await supabase.from("newsletter_subscribers").insert({ email: profile.email }).select();
-              }
-              toast.success("Informations enregistrées.");
-            } else {
-              toast.success("Informations enregistrées (démo). Connectez-vous pour persister.");
+            const { error } = await supabase
+              .from("profiles")
+              .update({
+                first_name: firstName.trim() || null,
+                last_name: lastName.trim() || null,
+                email: email.trim() || null,
+                phone: phone.trim() || null,
+                newsletter_opt_in: newsletter,
+              })
+              .eq("id", profile.id);
+            if (error) throw error;
+            if (newsletter && email.trim()) {
+              // best-effort: ensure newsletter_subscribers also has this email
+              await supabase.from("newsletter_subscribers").insert({ email: email.trim() });
             }
+            toast.success("Informations enregistrées.");
           } catch (err) {
             console.error("save profile error:", err);
             toast.error("Impossible d'enregistrer les informations.");
@@ -57,19 +74,19 @@ function AccountInfo() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="fn">Prénom</Label>
-            <Input id="fn" defaultValue={currentCustomer.first_name} />
+            <Input id="fn" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ln">Nom</Label>
-            <Input id="ln" defaultValue={currentCustomer.last_name} />
+            <Input id="ln" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="em">E-mail</Label>
-            <Input id="em" type="email" defaultValue={currentCustomer.email} />
+            <Input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ph">Téléphone</Label>
-            <Input id="ph" defaultValue={currentCustomer.phone} />
+            <Input id="ph" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </div>
 
@@ -80,27 +97,52 @@ function AccountInfo() {
           </Label>
         </div>
 
-        <Button variant="accent" type="submit" className="mt-6" disabled={saving}>
+        <Button variant="accent" type="submit" className="mt-6" disabled={saving || !profile}>
           {saving ? "Enregistrement…" : "Enregistrer"}
         </Button>
       </form>
 
       <form
         className="rounded-xl border border-border bg-card p-6"
-        onSubmit={(e) => { e.preventDefault(); toast.success("Mot de passe mis à jour (démo)."); }}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (pw1.length < 6) {
+            toast.error("Le mot de passe doit contenir au moins 6 caractères.");
+            return;
+          }
+          if (pw1 !== pw2) {
+            toast.error("Les mots de passe ne correspondent pas.");
+            return;
+          }
+          setChangingPassword(true);
+          try {
+            const { error } = await supabase.auth.updateUser({ password: pw1 });
+            if (error) throw error;
+            setPw1("");
+            setPw2("");
+            toast.success("Mot de passe mis à jour.");
+          } catch (err: any) {
+            console.error("update password error:", err);
+            toast.error(err?.message ?? "Impossible de mettre à jour le mot de passe.");
+          } finally {
+            setChangingPassword(false);
+          }
+        }}
       >
         <h2 className="text-lg font-bold">Mot de passe</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="pw1">Nouveau mot de passe</Label>
-            <Input id="pw1" type="password" placeholder="••••••••" />
+            <Input id="pw1" type="password" placeholder="••••••••" value={pw1} onChange={(e) => setPw1(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="pw2">Confirmation</Label>
-            <Input id="pw2" type="password" placeholder="••••••••" />
+            <Input id="pw2" type="password" placeholder="••••••••" value={pw2} onChange={(e) => setPw2(e.target.value)} />
           </div>
         </div>
-        <Button variant="outline" type="submit" className="mt-5">Mettre à jour</Button>
+        <Button variant="outline" type="submit" className="mt-5" disabled={changingPassword}>
+          {changingPassword ? "Mise à jour…" : "Mettre à jour"}
+        </Button>
       </form>
     </div>
   );

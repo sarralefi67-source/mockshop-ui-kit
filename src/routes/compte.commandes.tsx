@@ -113,7 +113,7 @@ function AccountOrders() {
                 <div>
                   <p className="font-semibold">{order.reference}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(order.created_at).toLocaleDateString("fr-FR")} · {order.items.length} article(s)
+                    {order.created_at ? new Date(order.created_at).toLocaleDateString("fr-FR") : "—"} · {order.items.length} article(s)
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -129,7 +129,7 @@ function AccountOrders() {
                   <ul className="space-y-3">
                     {order.items.map((item) => (
                       <li key={item.id} className="flex items-center gap-3">
-                        <img src={item.image} alt="" className="h-12 w-12 rounded-md border border-border object-cover" />
+                        <img src={item.image ?? undefined} alt="" className="h-12 w-12 rounded-md border border-border object-cover" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{item.name}</p>
                           {item.variant_label && (

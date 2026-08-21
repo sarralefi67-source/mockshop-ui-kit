@@ -1,14 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { StoreLayout } from "@/components/store/StoreLayout";
-import { ProductCard } from "@/components/store/ProductCard";
-import { isOnSale, products } from "@/data/products";
+import { ProductCard, ProductCardSkeleton } from "@/components/store/ProductCard";
+import { isOnSale } from "@/data/products";
+import { fetchActiveProducts } from "@/lib/catalog";
+import type { Product } from "@/types";
 
 export const Route = createFileRoute("/promotions")({
   head: () => ({
     meta: [
-      { title: "Promotions en cours — NexaStore" },
+      { title: "Promotions en cours — Yadawi" },
       { name: "description", content: "Toutes nos offres du moment sur l'informatique, la téléphonie et la maison." },
-      { property: "og:title", content: "Promotions en cours — NexaStore" },
+      { property: "og:title", content: "Promotions en cours — Yadawi" },
       { property: "og:description", content: "Jusqu'à -40% sur une sélection de produits, paiement à la livraison." },
     ],
   }),
@@ -16,6 +19,24 @@ export const Route = createFileRoute("/promotions")({
 });
 
 function PromotionsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchActiveProducts()
+      .then((data) => {
+        if (mounted) setProducts(data);
+      })
+      .catch((err) => console.error("load promotions products", err))
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const promos = products.filter(isOnSale);
   return (
     <StoreLayout>
@@ -28,7 +49,11 @@ function PromotionsPage() {
         </div>
       </div>
       <div className="container-page py-10">
-        {promos.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
+          </div>
+        ) : promos.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border py-20 text-center">
             <p className="font-semibold">Aucune promotion en cours</p>
           </div>

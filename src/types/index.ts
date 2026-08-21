@@ -136,6 +136,42 @@ export type Database = {
         }
         Relationships: []
       }
+      banners: {
+        Row: {
+          id: string
+          title: string | null
+          subtitle: string | null
+          image_url: string
+          link_url: string | null
+          position: number
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          title?: string | null
+          subtitle?: string | null
+          image_url: string
+          link_url?: string | null
+          position?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string | null
+          subtitle?: string | null
+          image_url?: string
+          link_url?: string | null
+          position?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           added_at: string | null
@@ -355,6 +391,36 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           subscribed_at?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          type: string
+          title: string
+          body: string | null
+          link: string | null
+          is_read: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          type: string
+          title: string
+          body?: string | null
+          link?: string | null
+          is_read?: boolean
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          type?: string
+          title?: string
+          body?: string | null
+          link?: string | null
+          is_read?: boolean
+          created_at?: string | null
         }
         Relationships: []
       }
@@ -933,6 +999,21 @@ export type Database = {
           Returns: Json
         }
       is_admin: { Args: never; Returns: boolean }
+      create_order: {
+        Args: {
+          p_items: Json
+          p_governorate: string
+          p_shipping_address: Json
+          p_coupon_code?: string | null
+          p_notes?: string | null
+          p_idempotency_key?: string | null
+        }
+        Returns: Json
+      }
+      validate_coupon: {
+        Args: { p_code: string; p_subtotal: number }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1051,6 +1132,32 @@ export type Category = {
 
 export type CategoryNode = Category & {
   children: CategoryNode[]
+}
+
+export type Address = {
+  id: string
+  label: string
+  full_name: string
+  phone: string
+  line1: string
+  city: string
+  governorate: string
+  postal_code: string
+  is_default: boolean
+}
+
+export type CartItem = {
+  key: string
+  product_id: string
+  variant_id: string | null
+  slug: string
+  name: string
+  variant_label: string | null
+  image: string
+  unit_price: number
+  compare_at_price: number | null
+  max_stock: number
+  quantity: number
 }
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">

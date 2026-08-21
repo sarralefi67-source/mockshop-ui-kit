@@ -4,7 +4,7 @@ import { StoreLayout } from "@/components/store/StoreLayout";
 const pages: Record<string, { title: string; intro: string; sections: { heading: string; body: string }[] }> = {
   cgv: {
     title: "Conditions générales de vente",
-    intro: "Les présentes conditions régissent les ventes réalisées sur NexaStore (contenu de démonstration).",
+    intro: "Les présentes conditions régissent les ventes réalisées sur Yadawi (contenu de démonstration).",
     sections: [
       { heading: "1. Commandes", body: "Toute commande passée sur le site vaut acceptation des présentes conditions. Une confirmation est envoyée par SMS après validation par notre équipe." },
       { heading: "2. Prix et paiement", body: "Les prix sont indiqués en dinars tunisiens, toutes taxes comprises. Le seul mode de règlement accepté est le paiement à la livraison (espèces à la réception)." },
@@ -25,8 +25,8 @@ const pages: Record<string, { title: string; intro: string; sections: { heading:
     title: "Mentions légales",
     intro: "Informations relatives à l'éditeur du site (contenu de démonstration).",
     sections: [
-      { heading: "Éditeur", body: "NexaStore SARL — Avenue Habib Bourguiba, Tunis, Tunisie. Matricule fiscal : 0000000/X/X/000." },
-      { heading: "Contact", body: "contact@nexastore.tn — +216 71 000 000" },
+      { heading: "Éditeur", body: "Yadawi SARL — Avenue Habib Bourguiba, Tunis, Tunisie. Matricule fiscal : 0000000/X/X/000." },
+      { heading: "Contact", body: "contact@yadawi.tn — +216 71 000 000" },
       { heading: "Hébergement", body: "Site hébergé sur une infrastructure cloud européenne." },
     ],
   },
@@ -49,9 +49,9 @@ export const Route = createFileRoute("/pages/$slug")({
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
-      return { meta: [{ title: "Page introuvable — NexaStore" }, { name: "robots", content: "noindex" }] };
+      return { meta: [{ title: "Page introuvable — Yadawi" }, { name: "robots", content: "noindex" }] };
     }
-    const title = `${loaderData.title} — NexaStore`;
+    const title = `${loaderData.title} — Yadawi`;
     return {
       meta: [
         { title },

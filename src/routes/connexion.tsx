@@ -9,12 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/connexion")({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
+    typeof search["redirect"] === "string" ? { redirect: search["redirect"] } : {},
   head: () => ({
     meta: [
-      { title: "Connexion — NexaStore" },
-      { name: "description", content: "Connectez-vous à votre compte NexaStore pour suivre vos commandes et vos favoris." },
-      { property: "og:title", content: "Connexion — NexaStore" },
-      { property: "og:description", content: "Accédez à votre espace client NexaStore." },
+      { title: "Connexion — Yadawi" },
+      { name: "description", content: "Connectez-vous à votre compte Yadawi pour suivre vos commandes et vos favoris." },
+      { property: "og:title", content: "Connexion — Yadawi" },
+      { property: "og:description", content: "Accédez à votre espace client Yadawi." },
     ],
   }),
   component: LoginPage,
@@ -24,6 +26,7 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAuth();
+  const { redirect } = Route.useSearch();
 
   return (
     <StoreLayout>
@@ -48,7 +51,7 @@ function LoginPage() {
               toast.error(error.message || "Erreur de connexion");
             } else {
               toast.success("Connecté");
-              navigate({ to: "/compte" });
+              navigate({ to: (redirect || "/compte") as "/compte" });
             }
           }}
         >

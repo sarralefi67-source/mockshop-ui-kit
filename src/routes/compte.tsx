@@ -2,17 +2,16 @@ import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tan
 import { useEffect } from "react";
 import { Heart, LogOut, MapPin, Package, User } from "lucide-react";
 import { StoreLayout } from "@/components/store/StoreLayout";
-import { currentCustomer } from "@/data/orders";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/compte")({
   head: () => ({
     meta: [
-      { title: "Mon compte — NexaStore" },
-      { name: "description", content: "Gérez vos informations, vos commandes, vos adresses et vos favoris NexaStore." },
-      { property: "og:title", content: "Mon compte — NexaStore" },
-      { property: "og:description", content: "Espace client NexaStore." },
+      { title: "Mon compte — Yadawi" },
+      { name: "description", content: "Gérez vos informations, vos commandes, vos adresses et vos favoris Yadawi." },
+      { property: "og:title", content: "Mon compte — Yadawi" },
+      { property: "og:description", content: "Espace client Yadawi." },
     ],
   }),
   component: AccountLayout,
@@ -27,11 +26,19 @@ const links = [
 
 function AccountLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/connexion" });
+    if (!loading && !user) navigate({ to: "/connexion", search: { redirect: "/compte" } });
   }, [loading, user, navigate]);
+
+  if (loading || !user) {
+    return (
+      <StoreLayout>
+        <div className="container-page py-24 text-center text-muted-foreground">Chargement…</div>
+      </StoreLayout>
+    );
+  }
 
   return (
     <StoreLayout>
@@ -40,9 +47,9 @@ function AccountLayout() {
           <div className="rounded-xl border border-border bg-card p-5">
             <p className="text-sm text-muted-foreground">Bonjour</p>
             <p className="text-lg font-bold">
-              {profile?.first_name ?? currentCustomer.first_name} {profile?.last_name ?? currentCustomer.last_name}
+              {profile?.first_name} {profile?.last_name}
             </p>
-            <p className="text-xs text-muted-foreground">{profile?.email ?? currentCustomer.email}</p>
+            <p className="text-xs text-muted-foreground">{profile?.email}</p>
           </div>
           <nav className="mt-4 space-y-1">
             {links.map(({ to, label, icon: Icon, exact }) => {
@@ -63,13 +70,17 @@ function AccountLayout() {
                 </Link>
               );
             })}
-            <Link
-              to="/connexion"
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
+            <button
+              type="button"
+              onClick={async () => {
+                await signOut();
+                navigate({ to: "/connexion" });
+              }}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
             >
               <LogOut className="h-4 w-4" />
               Se déconnecter
-            </Link>
+            </button>
           </nav>
         </aside>
 

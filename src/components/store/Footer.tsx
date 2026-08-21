@@ -1,13 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Mail, MapPin, Phone, Truck, ShieldCheck, RotateCcw } from "lucide-react";
-import { buildCategoryTree } from "@/data/categories";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-
-const tree = buildCategoryTree();
 
 export function Footer() {
   const [email, setEmail] = useState("");
@@ -35,7 +32,7 @@ export function Footer() {
       <div className="container-page grid gap-8 py-12 md:grid-cols-3">
         <div>
           <span className="text-lg font-extrabold">
-            E_<span className="text-accent-strong">Commerce</span>
+            Yada<span className="text-accent-strong">wi</span>
           </span>
           <p className="mt-3 text-sm text-muted-foreground">
             Votre boutique high-tech et maison en Tunisie. Des produits sélectionnés, livrés chez
@@ -43,7 +40,7 @@ export function Footer() {
           </p>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +216 71 000 000</li>
-            <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> contact@nexastore.tn</li>
+            <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> contact@yadawi.tn</li>
             <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> Avenue Habib Bourguiba, Tunis</li>
           </ul>
         </div>
@@ -100,7 +97,7 @@ export function Footer() {
 
       <div className="border-t border-border py-5">
         <p className="container-page text-center text-xs text-muted-foreground">
-          © 2026 NexaStore — Données de démonstration. Paiement à la livraison uniquement.
+          © 2026 Yadawi — Paiement à la livraison uniquement.
         </p>
       </div>
     </footer>

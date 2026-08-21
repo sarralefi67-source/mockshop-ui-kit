@@ -7,6 +7,8 @@ type Profile = {
   first_name?: string | null;
   last_name?: string | null;
   email?: string | null;
+  phone?: string | null;
+  newsletter_opt_in?: boolean | null;
 };
 
 type AuthContextValue = {

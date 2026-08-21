@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { addresses as seedAddresses } from "@/data/orders";
 import { GOVERNORATES } from "@/data/governorates";
 import type { Address } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,7 @@ const emptyAddress: Address = {
 };
 
 function AccountAddresses() {
-  const [list, setList] = useState<Address[]>(seedAddresses);
+  const [list, setList] = useState<Address[]>([]);
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -38,17 +37,7 @@ function AccountAddresses() {
       toast.error("Libellé et adresse sont obligatoires.");
       return;
     }
-    if (!profile) {
-      // local fallback for guests
-      setList((prev) =>
-        draft.id
-          ? prev.map((a) => (a.id === draft.id ? draft : a))
-          : [...prev, { ...draft, id: `a-${Date.now()}` }],
-      );
-      setOpen(false);
-      toast.success("Adresse enregistrée (démo). Si vous voulez sauvegarder votre compte, connectez-vous.");
-      return;
-    }
+    if (!profile) return;
 
     try {
       if (draft.id) {
@@ -93,7 +82,7 @@ function AccountAddresses() {
     let mounted = true;
     async function load() {
       if (!profile) {
-        setList(seedAddresses);
+        setList([]);
         setLoading(false);
         return;
       }
@@ -105,7 +94,17 @@ function AccountAddresses() {
         return;
       }
       if (!mounted) return;
-      setList(data ?? []);
+      setList((data ?? []).map((row) => ({
+        id: row.id,
+        label: row.label,
+        full_name: row.full_name ?? "",
+        phone: row.phone ?? "",
+        line1: row.line1 ?? "",
+        city: row.city ?? "",
+        governorate: row.governorate ?? "",
+        postal_code: row.postal_code ?? "",
+        is_default: row.is_default ?? false,
+      })));
       setLoading(false);
     }
     load();
@@ -202,11 +201,7 @@ function AccountAddresses() {
                     aria-label="Supprimer"
                     className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-surface hover:text-destructive"
                     onClick={async () => {
-                      if (!profile) {
-                        setList((p) => p.filter((x) => x.id !== a.id));
-                        toast.success("Adresse supprimée (démo).");
-                        return;
-                      }
+                      if (!profile) return;
                       try {
                         const { error } = await supabase.from("addresses").delete().eq("id", a.id).eq("user_id", profile.id);
                         if (error) throw error;

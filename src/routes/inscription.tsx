@@ -4,6 +4,7 @@ import { toast } from "sonner";
 // import HCaptcha from "@hcaptcha/react-hcaptcha"; // TODO: réactiver après achat du nom de domaine
 import { useAuth } from "@/context/AuthContext";
 import { StoreLayout } from "@/components/store/StoreLayout";
+import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,10 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 export const Route = createFileRoute("/inscription")({
   head: () => ({
     meta: [
-      { title: "Créer un compte — NexaStore" },
-      { name: "description", content: "Créez votre compte NexaStore pour commander plus vite et suivre vos livraisons." },
-      { property: "og:title", content: "Créer un compte — NexaStore" },
-      { property: "og:description", content: "Inscription gratuite à l'espace client NexaStore." },
+      { title: "Créer un compte — Yadawi" },
+      { name: "description", content: "Créez votre compte Yadawi pour commander plus vite et suivre vos livraisons." },
+      { property: "og:title", content: "Créer un compte — Yadawi" },
+      { property: "og:description", content: "Inscription gratuite à l'espace client Yadawi." },
     ],
   }),
   component: RegisterPage,
@@ -46,6 +47,8 @@ function RegisterPage() {
             const password = String(fd.get("pw") ?? "");
             const first_name = String(fd.get("fn") ?? "").trim() || null;
             const last_name = String(fd.get("ln") ?? "").trim() || null;
+            const phone = String(fd.get("ph") ?? "").trim() || null;
+            const wantsNewsletter = form.querySelector<HTMLButtonElement>("#nl")?.getAttribute("data-state") === "checked";
 
             // TODO: réactiver la vérification hCaptcha après achat du nom de domaine
             // if (!token) {
@@ -55,7 +58,7 @@ function RegisterPage() {
 
             setLoading(true);
             // le token hCaptcha est maintenant transmis en 4e argument à signUp
-            const { error } = await signUp(email, password, { first_name, last_name }, token ?? undefined);
+            const { error } = await signUp(email, password, { first_name, last_name, phone }, token ?? undefined);
             setLoading(false);
             if (error) {
               toast.error(error.message || "Erreur lors de la création du compte");
@@ -64,6 +67,12 @@ function RegisterPage() {
               // captchaRef.current?.resetCaptcha?.();
               setToken(null);
             } else {
+              if (wantsNewsletter) {
+                // best-effort: standalone table, not gated on the profile row existing yet
+                supabase.from("newsletter_subscribers").insert({ email }).then(({ error: nlError }) => {
+                  if (nlError) console.warn("newsletter subscribe on signup failed:", nlError);
+                });
+              }
               toast.success("Compte créé — vérifiez votre e-mail si confirmation requise.");
               navigate({ to: "/compte" });
             }

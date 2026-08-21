@@ -64,7 +64,6 @@ function AdminPromotions() {
   const [couponDraft, setCouponDraft] = useState<Partial<CouponRow> | null>(null);
   const [loading, setLoading] = useState(false);
   const [productsList, setProductsList] = useState<Array<{ id: string; name: string; sku?: string }>>([]);
-  const [variantsList, setVariantsList] = useState<Array<{ id: string; sku: string; product_id: string }>>([]);
   const [confirmDeletePromoId, setConfirmDeletePromoId] = useState<string | null>(null);
   const [confirmDeleteCouponId, setConfirmDeleteCouponId] = useState<string | null>(null);
   const [isDeletingPromo, setIsDeletingPromo] = useState(false);
@@ -117,17 +116,14 @@ function AdminPromotions() {
           { data: pData, error: pErr },
           { data: cData, error: cErr },
           { data: prodData, error: prodErr },
-          { data: varData, error: varErr },
         ] = await Promise.all([
           supabase.from("promotions").select("*").order("starts_at", { ascending: true }),
           supabase.from("coupons").select("*").order("starts_at", { ascending: true }),
           supabase.from("products").select("id,name,sku").order("created_at", { ascending: false }),
-          supabase.from("product_variants").select("id,sku,product_id"),
         ]);
         if (pErr) throw pErr;
         if (cErr) throw cErr;
         if (prodErr) throw prodErr;
-        if (varErr) throw varErr;
         if (!mounted) return;
         const today = new Date().toISOString().slice(0, 10);
         const expiredPromoIds = (pData ?? [])
@@ -145,11 +141,6 @@ function AdminPromotions() {
         )));
         setCouponList(cData ?? []);
         setProductsList((prodData ?? []).map((p: any) => ({ id: p.id, name: p.name ?? p.slug ?? p.id, sku: p.sku })));
-        setVariantsList((varData ?? []).map((v: any) => ({
-          id: v.id,
-          sku: v.sku ?? String(v.id).slice(0, 8),
-          product_id: v.product_id ?? "",
-        })));
       } catch (err) {
         console.error("load promotions/coupons", err);
         toast.error("Impossible de charger les promotions et coupons depuis la base.");
@@ -189,7 +180,9 @@ function AdminPromotions() {
         discount_type: promoDraft.discount_type ?? (promoDraft.discount_value !== undefined ? "percentage" : null),
         discount_value: promoDraft.discount_value ?? 0,
         product_id: productId,
-        variant_id: promoDraft.variant_id ?? null,
+        // Un produit ne peut avoir qu'une seule promotion à la fois (contrainte
+        // UNIQUE(product_id) en base) — pas de ciblage par variante.
+        variant_id: null,
         applies_to_all: appliesToAllProducts,
         starts_at: promoDraft.starts_at ?? null,
         ends_at: promoDraft.ends_at ?? null,
@@ -201,7 +194,6 @@ function AdminPromotions() {
         promo.id !== promoDraft.id
         && promo.product_id !== null
         && targetProductIds.includes(promo.product_id)
-        && (promo.variant_id ?? null) === (payload.variant_id ?? null)
       ));
       const rowsPayload = targetProductIds.map((targetId) => ({
         ...payload,
@@ -996,7 +988,7 @@ function AdminPromotions() {
                 <Select
                   value={promoDraft.product_id === null ? ALL_PRODUCTS_VALUE : (promoDraft.product_id ?? "")}
                   onValueChange={(v) => {
-                    setPromoDraft({ ...promoDraft, product_id: v, variant_id: null });
+                    setPromoDraft({ ...promoDraft, product_id: v });
                     setPromoValidation(({ product: _product, ...rest }) => rest);
                   }}
                 >
@@ -1016,23 +1008,6 @@ function AdminPromotions() {
                   </SelectContent>
                 </Select>
                 {promoValidation.product && <p className="text-xs text-destructive">{promoValidation.product}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Variante (optionnel)</Label>
-                <Select
-                  value={promoDraft.variant_id ?? "none"}
-                  onValueChange={(v) => setPromoDraft({ ...promoDraft, variant_id: v === "none" ? null : v })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Toutes les variantes" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Toutes les variantes</SelectItem>
-                    {variantsList.filter((v) => (
-                      promoDraft.product_id === ALL_PRODUCTS_VALUE || v.product_id === promoDraft.product_id
-                    )).map((v) => (
-                      <SelectItem key={v.id} value={v.id}>{v.sku ?? v.id.slice(0, 8)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Début</Label>

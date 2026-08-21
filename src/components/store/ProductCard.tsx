@@ -7,27 +7,23 @@ import { useStore } from "@/context/StoreContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stars } from "./Stars";
-import { toast } from "sonner";
 
 export function ProductCard({ product }: { product: Product }) {
   const { addItem, toggleWishlist, isWishlisted } = useStore();
   const liked = isWishlisted(product.id);
   const outOfStock = product.stock === 0;
-  const firstImage = product.images[0];
+  const hasVariants = product.variants.length > 0;
+  const mainImage = product.images.find((img) => img.is_main) ?? product.images[0];
 
   const quickAdd = () => {
-    if (outOfStock) return;
-    if (product.variants.length > 0) {
-      toast.info("Ce produit propose des variantes — choisissez-les sur la fiche produit.");
-      return;
-    }
+    if (outOfStock || hasVariants) return;
     addItem({
       product_id: product.id,
       variant_id: null,
       slug: product.slug,
       name: product.name,
       variant_label: null,
-      image: firstImage?.url ?? "",
+      image: mainImage?.url ?? "",
       unit_price: product.price,
       compare_at_price: product.compare_at_price,
       max_stock: product.stock,
@@ -69,8 +65,8 @@ export function ProductCard({ product }: { product: Product }) {
         className="block aspect-square overflow-hidden bg-surface"
       >
         <img
-          src={firstImage?.url}
-          alt={firstImage?.alt ?? product.name}
+          src={mainImage?.url}
+          alt={mainImage?.alt ?? product.name}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
@@ -110,16 +106,25 @@ export function ProductCard({ product }: { product: Product }) {
         </div>
 
         <div className="mt-4 flex gap-2">
-          <Button
-            variant="accent"
-            className="flex-1"
-            size="sm"
-            disabled={outOfStock}
-            onClick={quickAdd}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {outOfStock ? "Indisponible" : "Ajouter"}
-          </Button>
+          {hasVariants && !outOfStock ? (
+            <Button variant="accent" className="flex-1" size="sm" asChild>
+              <Link to="/produit/$slug" params={{ slug: product.slug }}>
+                <ShoppingCart className="h-4 w-4" />
+                Choisir
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              variant="accent"
+              className="flex-1"
+              size="sm"
+              disabled={outOfStock}
+              onClick={quickAdd}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {outOfStock ? "Indisponible" : "Ajouter"}
+            </Button>
+          )}
         </div>
       </div>
     </article>
