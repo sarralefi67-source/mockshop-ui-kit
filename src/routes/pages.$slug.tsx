@@ -71,7 +71,7 @@ function StaticPage() {
   return (
     <StoreLayout>
       <div className="container-page max-w-3xl py-12">
-        <h1 className="text-3xl font-extrabold">{page.title}</h1>
+        <h1 className="page-title text-3xl">{page.title}</h1>
         <p className="mt-3 text-muted-foreground">{page.intro}</p>
         <div className="mt-8 space-y-7">
           {page.sections.map((s) => (

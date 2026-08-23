@@ -11,6 +11,11 @@ type Profile = {
   newsletter_opt_in?: boolean | null;
 };
 
+export type AuthMode = "signin" | "signup";
+
+/** Etat de la modale de connexion / inscription (voir AuthDialog). */
+type AuthDialogState = { open: boolean; mode: AuthMode; redirect: string | null };
+
 type AuthContextValue = {
   user: any | null;
   profile: Profile | null;
@@ -23,6 +28,12 @@ type AuthContextValue = {
     captchaToken?: string
   ) => Promise<{ error?: any }>;
   signOut: () => Promise<void>;
+  authDialog: AuthDialogState;
+  /** Ouvre la modale. `redirect` sert quand l'action en cours exige une
+   *  destination une fois connecté (commander, consulter son compte…). */
+  openAuth: (mode?: AuthMode, redirect?: string | null) => void;
+  setAuthMode: (mode: AuthMode) => void;
+  closeAuth: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,6 +42,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authDialog, setAuthDialog] = useState<AuthDialogState>({
+    open: false,
+    mode: "signin",
+    redirect: null,
+  });
+
+  const openAuth = (mode: AuthMode = "signin", redirect: string | null = null) =>
+    setAuthDialog({ open: true, mode, redirect });
+  const setAuthMode = (mode: AuthMode) => setAuthDialog((prev) => ({ ...prev, mode }));
+  const closeAuth = () => setAuthDialog((prev) => ({ ...prev, open: false }));
 
   useEffect(() => {
     let mounted = true;
@@ -117,7 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, profile, loading, signIn, signUp, signOut, authDialog, openAuth, setAuthMode, closeAuth }}
+    >
       {children}
     </AuthContext.Provider>
   );

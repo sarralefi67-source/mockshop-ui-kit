@@ -31,6 +31,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin.notificat
 import { Route as AdminParametresRouteImport } from './routes/admin.parametres'
 import { Route as AdminProduitsRouteImport } from './routes/admin.produits'
 import { Route as AdminPromotionsRouteImport } from './routes/admin.promotions'
+import { Route as BanniereIdRouteImport } from './routes/banniere.$id'
 import { Route as CategorieSlugRouteImport } from './routes/categorie.$slug'
 import { Route as CompteIndexRouteImport } from './routes/compte.index'
 import { Route as CompteAdressesRouteImport } from './routes/compte.adresses'
@@ -148,6 +149,11 @@ const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
   path: '/promotions',
   getParentRoute: () => AdminRoute,
 } as any)
+const BanniereIdRoute = BanniereIdRouteImport.update({
+  id: '/banniere/$id',
+  path: '/banniere/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CategorieSlugRoute = CategorieSlugRouteImport.update({
   id: '/categorie/$slug',
   path: '/categorie/$slug',
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
+  '/banniere/$id': typeof BanniereIdRoute
   '/categorie/$slug': typeof CategorieSlugRoute
   '/compte/adresses': typeof CompteAdressesRoute
   '/compte/commandes': typeof CompteCommandesRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
+  '/banniere/$id': typeof BanniereIdRoute
   '/categorie/$slug': typeof CategorieSlugRoute
   '/compte/adresses': typeof CompteAdressesRoute
   '/compte/commandes': typeof CompteCommandesRoute
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
   '/admin/promotions': typeof AdminPromotionsRoute
+  '/banniere/$id': typeof BanniereIdRoute
   '/categorie/$slug': typeof CategorieSlugRoute
   '/compte/adresses': typeof CompteAdressesRoute
   '/compte/commandes': typeof CompteCommandesRoute
@@ -292,6 +301,7 @@ export interface FileRouteTypes {
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
+    | '/banniere/$id'
     | '/categorie/$slug'
     | '/compte/adresses'
     | '/compte/commandes'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
+    | '/banniere/$id'
     | '/categorie/$slug'
     | '/compte/adresses'
     | '/compte/commandes'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/admin/parametres'
     | '/admin/produits'
     | '/admin/promotions'
+    | '/banniere/$id'
     | '/categorie/$slug'
     | '/compte/adresses'
     | '/compte/commandes'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   FavorisRoute: typeof FavorisRoute
   InscriptionRoute: typeof InscriptionRoute
   PromotionsRoute: typeof PromotionsRoute
+  BanniereIdRoute: typeof BanniereIdRoute
   CategorieSlugRoute: typeof CategorieSlugRoute
   PagesSlugRoute: typeof PagesSlugRoute
   ProduitSlugRoute: typeof ProduitSlugRoute
@@ -531,6 +544,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPromotionsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/banniere/$id': {
+      id: '/banniere/$id'
+      path: '/banniere/$id'
+      fullPath: '/banniere/$id'
+      preLoaderRoute: typeof BanniereIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/categorie/$slug': {
       id: '/categorie/$slug'
       path: '/categorie/$slug'
@@ -634,6 +654,7 @@ const rootRouteChildren: RootRouteChildren = {
   FavorisRoute: FavorisRoute,
   InscriptionRoute: InscriptionRoute,
   PromotionsRoute: PromotionsRoute,
+  BanniereIdRoute: BanniereIdRoute,
   CategorieSlugRoute: CategorieSlugRoute,
   PagesSlugRoute: PagesSlugRoute,
   ProduitSlugRoute: ProduitSlugRoute,

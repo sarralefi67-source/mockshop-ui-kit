@@ -17,18 +17,38 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { randomUUID } from "@/lib/uid";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-// crypto.randomUUID() is only exposed in secure contexts (HTTPS / localhost)
-// — fall back to a plain random string elsewhere. Only needs to be unique,
-// not RFC4122-compliant (the DB column is just `text unique`).
-function generateIdempotencyKey(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+const STOCK_PREFIX = "Insufficient stock for ";
+
+/** Messages levés par public.create_order — voir database/create-order-rpc.sql. */
+const ORDER_ERRORS: Record<string, string> = {
+  "Authentication required": "Vous devez être connecté pour commander.",
+  "Cart is empty": "Votre panier est vide.",
+  "Invalid quantity": "La quantité d'un article de votre panier est invalide.",
+  "Shipping not available for this governorate":
+    "Aucun tarif de livraison n'est configuré pour ce gouvernorat.",
+  "Product not available": "Un produit de votre panier n'est plus disponible à la vente.",
+  "Variant not available": "Une variante de votre panier n'est plus disponible.",
+  "Invalid or expired coupon": "Code promo invalide ou expiré.",
+  "Order does not meet the minimum amount for this coupon":
+    "Le montant minimum requis par ce code promo n'est pas atteint.",
+  "Coupon usage limit reached": "Ce code promo a atteint sa limite d'utilisation.",
+  "You have already used this coupon": "Vous avez déjà utilisé ce code promo.",
+};
+
+function orderErrorMessage(error: any): string {
+  const raw = String(error?.message ?? "");
+  if (raw.includes(STOCK_PREFIX)) {
+    return `Stock insuffisant pour ${raw.slice(raw.indexOf(STOCK_PREFIX) + STOCK_PREFIX.length)}.`;
   }
-  return `ord_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  for (const [needle, message] of Object.entries(ORDER_ERRORS)) {
+    if (raw.includes(needle)) return message;
+  }
+  return raw || "Impossible de valider la commande. Réessayez.";
 }
 
 export const Route = createFileRoute("/checkout")({
@@ -46,14 +66,14 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, openAuth } = useAuth();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [shippingRates, setShippingRates] = useState<Record<string, number>>({});
   const navigate = useNavigate();
-  const idempotencyKey = useRef(generateIdempotencyKey());
+  const idempotencyKey = useRef(randomUUID());
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -134,12 +154,14 @@ function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // account required to checkout — send to login and back once signed in
+  // Compte requis pour commander : on ouvre la modale sans quitter le panier,
+  // et on revient ici une fois connecté.
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate({ to: "/connexion", search: { redirect: "/checkout" } });
+      openAuth("signin", "/checkout");
     }
-  }, [authLoading, user, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
 
   useEffect(() => {
     let mounted = true;
@@ -241,8 +263,16 @@ function CheckoutPage() {
       clearCart();
       navigate({ to: "/commande-confirmee", search: { ref: result.order_number } });
     } catch (err: any) {
-      console.error("create_order", err);
-      toast.error(err?.message ?? "Impossible de valider la commande. Réessayez.");
+      // Une PostgrestError range l'essentiel dans details/hint/code : sans les
+      // journaliser, un 500 ne laisse qu'un « create_order » opaque en console.
+      console.error("create_order", {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        error: err,
+      });
+      toast.error(orderErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +306,7 @@ function CheckoutPage() {
   return (
     <StoreLayout>
       <div className="container-page py-10">
-        <h1 className="text-3xl font-extrabold">Finaliser ma commande</h1>
+        <h1 className="page-title text-3xl">Finaliser ma commande</h1>
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
           <div className="space-y-6">

@@ -172,6 +172,24 @@ export type Database = {
         }
         Relationships: []
       }
+      banner_products: {
+        Row: {
+          banner_id: string
+          product_id: string
+          position: number
+        }
+        Insert: {
+          banner_id: string
+          product_id: string
+          position?: number
+        }
+        Update: {
+          banner_id?: string
+          product_id?: string
+          position?: number
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           added_at: string | null
@@ -670,6 +688,7 @@ export type Database = {
           has_variants: boolean | null
           id: string
           is_active: boolean | null
+          is_new: boolean | null
           meta_description: string | null
           meta_title: string | null
           name: string
@@ -691,6 +710,7 @@ export type Database = {
           has_variants?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_new?: boolean | null
           meta_description?: string | null
           meta_title?: string | null
           name: string
@@ -712,6 +732,7 @@ export type Database = {
           has_variants?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_new?: boolean | null
           meta_description?: string | null
           meta_title?: string | null
           name?: string

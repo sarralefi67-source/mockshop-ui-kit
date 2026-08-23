@@ -29,7 +29,16 @@ declare
   v_item jsonb;
   v_qty int;
   v_product record;
-  v_variant record;
+  -- Volontairement des scalaires et non un `record` : un record RECORD reste
+  -- « not assigned » tant qu'aucun SELECT INTO ne lui a donné sa structure, et
+  -- toucher un de ses champs avant cela lève une erreur interne (SQLSTATE
+  -- 55000) — que PostgREST renvoie en HTTP 500. C'est exactement ce qui se
+  -- produisait sur une ligne de commande sans variante.
+  v_variant_id uuid;
+  v_variant_sku text;
+  v_variant_price numeric;
+  v_variant_stock int;
+  v_variant_active boolean;
   v_promo record;
   v_base_price numeric;
   v_unit_price numeric;
@@ -97,27 +106,29 @@ begin
         and (starts_at is null or starts_at <= now())
         and (ends_at is null or ends_at >= now());
 
-    if nullif(v_item->>'variant_id', '') is not null then
-      select id, sku, price, stock_quantity, is_active
-        into v_variant
+    v_variant_id := nullif(v_item->>'variant_id', '')::uuid;
+    v_variant_sku := null;
+
+    if v_variant_id is not null then
+      select sku, price, stock_quantity, is_active
+        into v_variant_sku, v_variant_price, v_variant_stock, v_variant_active
         from public.product_variants
-        where id = (v_item->>'variant_id')::uuid and product_id = v_product.id
+        where id = v_variant_id and product_id = v_product.id
         for update;
-      if v_variant.id is null or v_variant.is_active is false then
+      if not found or v_variant_active is false then
         raise exception 'Variant not available';
       end if;
-      if v_variant.stock_quantity < v_qty then
+      if coalesce(v_variant_stock, 0) < v_qty then
         raise exception 'Insufficient stock for %', v_product.name;
       end if;
-      v_base_price := v_variant.price;
-      update public.product_variants set stock_quantity = stock_quantity - v_qty where id = v_variant.id;
+      v_base_price := v_variant_price;
+      update public.product_variants set stock_quantity = stock_quantity - v_qty where id = v_variant_id;
     else
-      if v_product.stock_quantity < v_qty then
+      if coalesce(v_product.stock_quantity, 0) < v_qty then
         raise exception 'Insufficient stock for %', v_product.name;
       end if;
       v_base_price := v_product.base_price;
       update public.products set stock_quantity = stock_quantity - v_qty where id = v_product.id;
-      v_variant.sku := null;
     end if;
 
     v_unit_price := case
@@ -132,11 +143,9 @@ begin
       order_id, product_id, variant_id, product_name, variant_label, sku, unit_price, quantity, total
     )
     values (
-      v_order_id, v_product.id, nullif(v_item->>'variant_id', '')::uuid, v_product.name,
-      nullif(v_item->>'variant_label', ''), coalesce(v_variant.sku, v_product.sku), v_unit_price, v_qty, v_line_total
+      v_order_id, v_product.id, v_variant_id, v_product.name,
+      nullif(v_item->>'variant_label', ''), coalesce(v_variant_sku, v_product.sku), v_unit_price, v_qty, v_line_total
     );
-
-    v_variant := null;
   end loop;
 
   if p_coupon_code is not null and trim(p_coupon_code) <> '' then

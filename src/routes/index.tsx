@@ -75,7 +75,8 @@ function HomePage() {
   }, [carouselApi, banners.length]);
 
   const promos = products.filter(isOnSale).slice(0, 4);
-  const nouveautes = [...products]
+  const nouveautes = products
+    .filter((p) => p.is_new)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 4);
 
@@ -83,7 +84,7 @@ function HomePage() {
     <StoreLayout>
       {/* Hero */}
       {banners.length > 0 && (
-        <section className="border-b border-border bg-surface">
+        <section className="border-b border-surface bg-surface">
           <Carousel setApi={setCarouselApi} opts={{ loop: true }}>
             <CarouselContent>
               {banners.map((banner) => {
@@ -97,10 +98,10 @@ function HomePage() {
                     {(banner.title || banner.subtitle) && (
                       <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-foreground/60 via-foreground/10 to-transparent p-6 sm:p-10">
                         {banner.title && (
-                          <h2 className="text-xl font-extrabold text-background sm:text-3xl">{banner.title}</h2>
+                          <h2 className="font-display text-2xl font-semibold tracking-tight text-background sm:text-4xl">{banner.title}</h2>
                         )}
                         {banner.subtitle && (
-                          <p className="mt-1 max-w-md text-sm text-background/90 sm:text-base">{banner.subtitle}</p>
+                          <p className="mt-2 max-w-md text-sm text-background/90 sm:text-base">{banner.subtitle}</p>
                         )}
                       </div>
                     )}
@@ -108,7 +109,14 @@ function HomePage() {
                 );
                 return (
                   <CarouselItem key={banner.id}>
-                    <a href="/promotions" className="block">{slide}</a>
+                    {banner.products_count > 0 ? (
+                      // Produits associés en admin -> page dédiée listant cette sélection
+                      <Link to="/banniere/$id" params={{ id: banner.id }} className="block">
+                        {slide}
+                      </Link>
+                    ) : (
+                      <a href={banner.link_url || "/promotions"} className="block">{slide}</a>
+                    )}
                   </CarouselItem>
                 );
               })}
@@ -127,7 +135,7 @@ function HomePage() {
       {/* {categoryTree.length > 0 && (
         <section className="container-page py-12">
           <div className="flex items-end justify-between">
-            <h2 className="text-2xl font-bold">Catégories phares</h2>
+            <h2 className="section-title">Catégories phares</h2>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {categoryTree.map((cat) => (
@@ -155,14 +163,14 @@ function HomePage() {
 
       {/* Promos */}
       {(loading || promos.length > 0) && (
-        <section className="border-y border-border bg-surface py-12">
+        <section className="border-y border-border/60 bg-surface py-14">
           <div className="container-page">
             <div className="flex items-end justify-between">
               <div>
-                <h2 className="text-2xl font-bold">En promotion</h2>
-                <p className="text-sm text-muted-foreground">Offres valables jusqu'à fin du mois.</p>
+                <h2 className="page-title text-2xl">En promotion</h2>
+                {/* <p className="text-sm text-muted-foreground">Offres valables jusqu'à fin du mois.</p> */}
               </div>
-              <Link to="/promotions" className="text-sm font-semibold text-accent-strong hover:underline">
+              <Link to="/promotions" className="shrink-0 text-sm font-semibold text-accent-strong hover:underline">
                 Tout voir
               </Link>
             </div>
@@ -176,22 +184,20 @@ function HomePage() {
       )}
 
       {/* Nouveautés */}
-      {(loading || nouveautes.length > 0) && (
-        <section className="container-page py-12">
-          <h2 className="text-2xl font-bold">Nouveautés</h2>
+      {!loading && nouveautes.length > 0 && (
+        <section className="container-page py-14">
+          <h2 className="section-title">Nouveautés</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
-              : nouveautes.map((p) => <ProductCard key={p.id} product={p} />)}
+            {nouveautes.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </section>
       )}
 
       {/* Tous les produits */}
       {(loading || products.length > 0) && (
-        <section className="border-t border-border bg-surface py-12">
+        <section className="border-t border-border/60 py-14">
           <div className="container-page">
-            <h2 className="text-2xl font-bold">Tous nos produits</h2>
+            <h2 className="section-title">Tous nos produits</h2>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)

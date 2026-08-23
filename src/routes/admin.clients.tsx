@@ -53,7 +53,7 @@ function LoadingTableRow() {
   );
 }
 
-export default function AdminClients() {
+function AdminClients() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");

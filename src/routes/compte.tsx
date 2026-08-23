@@ -26,11 +26,14 @@ const links = [
 
 function AccountLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, openAuth } = useAuth();
   const navigate = useNavigate();
   useEffect(() => {
-    if (!loading && !user) navigate({ to: "/connexion", search: { redirect: "/compte" } });
-  }, [loading, user, navigate]);
+    if (loading || user) return;
+    navigate({ to: "/" });
+    openAuth("signin", "/compte");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user]);
 
   if (loading || !user) {
     return (
@@ -74,7 +77,7 @@ function AccountLayout() {
               type="button"
               onClick={async () => {
                 await signOut();
-                navigate({ to: "/connexion" });
+                navigate({ to: "/" });
               }}
               className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-surface hover:text-foreground"
             >

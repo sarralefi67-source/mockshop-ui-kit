@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import type { Product, ProductImage } from "@/types";
+import { genId } from "@/lib/uid";
 
 export default function ProductImages({ draft, setDraft }: { draft: Product; setDraft: (p: Product) => void }) {
   return (
@@ -78,7 +79,7 @@ export default function ProductImages({ draft, setDraft }: { draft: Product; set
               if (files.length === 0) return;
               const hadImages = draft.images.length > 0;
               const nextImages = files.map((file, index): ProductImage => ({
-                id: `img-${crypto.randomUUID()}`,
+                id: genId("img"),
                 product_id: draft.id || "new",
                 url: URL.createObjectURL(file),
                 alt: file.name,

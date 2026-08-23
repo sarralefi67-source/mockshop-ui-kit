@@ -10,20 +10,20 @@ export function Footer() {
   const [email, setEmail] = useState("");
 
   return (
-    <footer className="mt-16 border-t border-border bg-card">
-      <div className="container-page grid gap-6 border-b border-border py-8 sm:grid-cols-3">
+    <footer className="weave-texture mt-16 bg-deep text-deep-foreground/80">
+      <div className="container-page grid gap-6 border-b border-deep-foreground/15 py-8 sm:grid-cols-3">
         {[
           { icon: Truck, title: "Livraison 24/48h", text: "Partout en Tunisie, 7 DT" },
           { icon: ShieldCheck, title: "Paiement à la livraison", text: "Payez à la réception" },
           { icon: RotateCcw, title: "Retour sous 7 jours", text: "Satisfait ou remboursé" },
         ].map(({ icon: Icon, title, text }) => (
           <div key={title} className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface text-accent-strong">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-deep-foreground/10 text-ocre">
               <Icon className="h-5 w-5" />
             </span>
             <span>
-              <span className="block text-sm font-semibold">{title}</span>
-              <span className="block text-xs text-muted-foreground">{text}</span>
+              <span className="block font-display text-sm font-semibold text-deep-foreground">{title}</span>
+              <span className="block text-xs text-deep-foreground/60">{text}</span>
             </span>
           </div>
         ))}
@@ -31,14 +31,14 @@ export function Footer() {
 
       <div className="container-page grid gap-8 py-12 md:grid-cols-3">
         <div>
-          <span className="text-lg font-extrabold">
-            Arti<span className="text-accent-strong">sanat</span>
+          <span className="font-display text-2xl font-semibold tracking-tight text-deep-foreground">
+            Arti<span className="text-ocre">sanat</span>
           </span>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mt-3 text-sm text-deep-foreground/70">
             Votre boutique high-tech et maison en Tunisie. Des produits sélectionnés, livrés chez
             vous, payés à la livraison.
           </p>
-          <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+          <ul className="mt-4 space-y-2 text-sm text-deep-foreground/70">
             <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +216 71 000 000</li>
             <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> contact@Artisanat.tn</li>
             <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> Avenue Habib Bourguiba, Tunis</li>
@@ -48,20 +48,20 @@ export function Footer() {
      
 
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wide">Informations</h3>
+          <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Informations</h3>
           <ul className="mt-4 space-y-2">
-            <li><Link to="/pages/$slug" params={{ slug: "cgv" }} className="text-sm text-muted-foreground hover:text-accent-strong">CGV</Link></li>
-            <li><Link to="/pages/$slug" params={{ slug: "cgu" }} className="text-sm text-muted-foreground hover:text-accent-strong">CGU</Link></li>
-            <li><Link to="/pages/$slug" params={{ slug: "mentions-legales" }} className="text-sm text-muted-foreground hover:text-accent-strong">Mentions légales</Link></li>
-            <li><Link to="/pages/$slug" params={{ slug: "livraison" }} className="text-sm text-muted-foreground hover:text-accent-strong">Livraison & retours</Link></li>
-            <li><Link to="/contact" className="text-sm text-muted-foreground hover:text-accent-strong">Contact</Link></li>
-            <li><Link to="/admin" className="text-sm text-muted-foreground hover:text-accent-strong">Back-office</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "cgv" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGV</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "cgu" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGU</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "mentions-legales" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Mentions légales</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "livraison" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Livraison & retours</Link></li>
+            <li><Link to="/contact" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Contact</Link></li>
+            <li><Link to="/admin" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Back-office</Link></li>
           </ul>
         </div>
 
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wide">Newsletter</h3>
-          <p className="mt-4 text-sm text-muted-foreground">
+          <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Newsletter</h3>
+          <p className="mt-4 text-sm text-deep-foreground/70">
             Recevez les promos et nouveautés une fois par semaine.
           </p>
           <form
@@ -89,14 +89,24 @@ export function Footer() {
               }
             }}
           >
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required placeholder="Votre e-mail" aria-label="E-mail" />
-            <Button variant="accent" type="submit">OK</Button>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              placeholder="Votre e-mail"
+              aria-label="E-mail"
+              className="h-11 rounded-md border-deep-foreground/20 bg-deep-foreground/10 text-deep-foreground placeholder:text-deep-foreground/50"
+            />
+            <Button variant="accent" type="submit" className="h-11 px-6 font-bold uppercase tracking-[0.08em]">
+              OK
+            </Button>
           </form>
         </div>
       </div>
 
-      <div className="border-t border-border py-5">
-        <p className="container-page text-center text-xs text-muted-foreground">
+      <div className="border-t border-deep-foreground/15 py-5">
+        <p className="container-page text-center text-xs text-deep-foreground/60">
           © 2026 Artisanat — Paiement à la livraison uniquement.
         </p>
       </div>

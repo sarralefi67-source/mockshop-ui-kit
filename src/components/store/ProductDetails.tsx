@@ -51,7 +51,7 @@ export function ProductDetails({
       <p className="mt-4 text-muted-foreground">{product.short_description}</p>
 
       <div className="mt-6 flex items-baseline gap-3">
-        <span className={"text-3xl font-extrabold " + (isOnSale(product) ? "text-destructive" : "")}>{formatPrice(product.price)}</span>
+        <span className={"font-display text-3xl font-semibold " + (isOnSale(product) ? "text-accent-strong" : "")}>{formatPrice(product.price)}</span>
         {product.compare_at_price && (
           <span className="text-lg text-muted-foreground line-through">{formatPrice(product.compare_at_price)}</span>
         )}

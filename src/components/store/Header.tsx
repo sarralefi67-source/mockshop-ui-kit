@@ -36,9 +36,19 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
+function Logo({ className }: { className?: string }) {
+  return (
+    <Link to="/" className={className}>
+      <span className="font-display text-2xl font-semibold tracking-tight">
+        Arti<span className="text-accent-strong">sanat</span>
+      </span>
+    </Link>
+  );
+}
+
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, openAuth } = useAuth();
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -72,10 +82,10 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 bg-card">
-      <div className="bg-foreground text-background">
-        <div className="container-page relative flex h-9 items-center justify-center gap-2 text-xs">
+      <div className="weave-texture border-b border-border/60 bg-surface text-foreground">
+        <div className="container-page relative flex h-10 items-center justify-center gap-2 text-[13px]">
           <p className="flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5" /> +216 71 000 000 — Livraison 24/48h
+            <Phone className="h-3.5 w-3.5 text-accent-strong" /> +216 71 000 000 — Livraison 24/48h
           </p>
           <p className="hidden font-medium sm:block">— Paiement à la livraison partout en Tunisie</p>
 
@@ -85,7 +95,7 @@ export function Header() {
               target="_blank"
               rel="noreferrer"
               aria-label="Instagram"
-              className="text-background/80 transition-colors hover:text-background"
+              className="text-muted-foreground transition-colors hover:text-accent-strong"
             >
               <Instagram className="h-3.5 w-3.5" />
             </a>
@@ -94,7 +104,7 @@ export function Header() {
               target="_blank"
               rel="noreferrer"
               aria-label="TikTok"
-              className="text-background/80 transition-colors hover:text-background"
+              className="text-muted-foreground transition-colors hover:text-accent-strong"
             >
               <TikTokIcon className="h-3.5 w-3.5" />
             </a>
@@ -103,7 +113,7 @@ export function Header() {
               target="_blank"
               rel="noreferrer"
               aria-label="WhatsApp"
-              className="text-background/80 transition-colors hover:text-background"
+              className="text-muted-foreground transition-colors hover:text-accent-strong"
             >
               <WhatsAppIcon className="h-3.5 w-3.5" />
             </a>
@@ -111,33 +121,33 @@ export function Header() {
         </div>
       </div>
 
-      <div className="border-b border-border">
-        <div className="container-page grid h-16 grid-cols-[auto_1fr_auto] items-center gap-4">
+      <div className="border-b border-surface lg:border-b-0">
+        <div className="container-page grid h-20 grid-cols-[1fr_auto_1fr] items-center gap-4 lg:grid-cols-[auto_1fr_auto]">
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden text-foreground"
+              className="text-foreground lg:hidden"
               aria-label="Ouvrir le menu"
               onClick={() => setMobileOpen(true)}
             >
               <Menu className="h-6 w-6" />
             </button>
 
-            <Link to="/" className="flex items-center gap-2">
-              <span className="text-lg font-extrabold">
-                Arti<span className="text-accent-strong">sanat</span>
-              </span>
-            </Link>
+            <Logo className="hidden items-center gap-2 lg:flex" />
           </div>
 
-          <div className="relative mx-auto hidden w-full max-w-xl md:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Logo className="flex justify-center lg:hidden" />
+
+          <div className="relative mx-auto hidden w-full max-w-xl lg:block">
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher un produit, une marque…"
-              className="h-10 pl-9"
+              className="h-11 rounded-md border-border bg-card pr-14 shadow-none"
               aria-label="Rechercher"
             />
+            <span className="pointer-events-none absolute right-0 top-0 grid h-11 w-12 place-items-center rounded-r-md bg-accent-strong text-accent-strong-foreground">
+              <Search className="h-4 w-4" />
+            </span>
             {query.trim().length > 0 && (
               <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-border bg-card shadow-pop">
                 {results.length === 0 ? (
@@ -172,7 +182,7 @@ export function Header() {
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-end gap-1">
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="hidden sm:block text-sm font-medium">{profile?.first_name ?? user.email}</span>
@@ -186,10 +196,13 @@ export function Header() {
                 </Button>
               </div>
             ) : (
-              <Button variant="ghost" size="icon" asChild aria-label="Mon compte">
-                <Link to="/connexion">
-                  <User className="h-5 w-5" />
-                </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Se connecter"
+                onClick={() => openAuth("signin")}
+              >
+                <User className="h-5 w-5" />
               </Button>
             )}
             <Button variant="ghost" size="icon" asChild aria-label="Mes favoris" className="relative">
@@ -205,7 +218,7 @@ export function Header() {
             <button
               onClick={() => setCartOpen(true)}
               aria-label="Ouvrir le panier"
-              className="relative grid h-9 w-9 place-items-center rounded-md hover:bg-accent"
+              className="relative grid h-10 w-10 place-items-center rounded-md transition-colors hover:bg-accent hover:text-accent-strong"
             >
               <ShoppingCart className="h-5 w-5" />
               {count > 0 && (
@@ -217,16 +230,18 @@ export function Header() {
           </div>
         </div>
 
-        <div className="container-page pb-3 md:hidden">
+        <div className="container-page pb-3 lg:hidden">
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher…"
-              className="h-10 pl-9"
+              className="h-11 rounded-md border-border bg-card pr-14 shadow-none"
               aria-label="Rechercher"
             />
+            <span className="pointer-events-none absolute right-0 top-0 grid h-11 w-12 place-items-center rounded-r-md bg-accent-strong text-accent-strong-foreground">
+              <Search className="h-4 w-4" />
+            </span>
             {query.trim().length > 0 && (
               <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-border bg-card shadow-pop">
                 {results.length === 0 ? (

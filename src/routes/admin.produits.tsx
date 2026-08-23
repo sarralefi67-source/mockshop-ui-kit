@@ -30,6 +30,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { genId } from "@/lib/uid";
+import { RichText } from "@/components/ui/rich-text";
 import {
   Pagination,
   PaginationContent,
@@ -42,19 +44,6 @@ import {
 export const Route = createFileRoute("/admin/produits")({
   component: AdminProducts,
 });
-
-// Date.now() seul peut renvoyer deux fois la même valeur si deux ids sont
-// générés dans la même milliseconde (ex: ajouter plusieurs valeurs
-// d'attribut rapidement). Deux entrées avec le même id cassent React (clés
-// dupliquées) et font que "Supprimer" semble ne rien faire, ou supprime la
-// mauvaise ligne. On utilise crypto.randomUUID() quand disponible, avec un
-// repli robuste sinon.
-const genId = (prefix: string) => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
 
 const emptyProduct: Product = {
   id: "", name: "", slug: "", brand: "", category_id: "",
@@ -84,6 +73,7 @@ function AdminProducts() {
 
   const [toggleConfirm, setToggleConfirm] = useState<{ id: string; next: boolean } | null>(null);
   const [isToggling, setIsToggling] = useState(false);
+  const [togglingNewId, setTogglingNewId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   useEffect(() => { fetchProducts(); }, []);
@@ -180,7 +170,14 @@ function AdminProducts() {
     }
     try {
       const { data: cats } = await supabase.from("categories").select("id,name,parent_id");
-      const catsArr = (cats ?? []).map((c: any) => ({ id: c.id, name: c.name, parent_id: c.parent_id ?? null }));
+      const catsArr = (cats ?? []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        // Une catégorie racine se référence elle-même (cf.
+        // database/categories-parent-id.sql) : sans ce retour à null, les
+        // remontées d'ancêtres plus bas bouclent indéfiniment.
+        parent_id: c.parent_id && c.parent_id !== c.id ? c.parent_id : null,
+      }));
       setCategoriesList(catsArr);
       setCategoriesMap(catsArr.reduce((acc: Record<string, string>, c: any) => ({ ...acc, [c.id]: c.name }), {}));
     } catch (e) {
@@ -217,7 +214,7 @@ function AdminProducts() {
         stock: d.stock_quantity ?? 0,
         sku: d.sku ?? "",
         is_active: d.is_active ?? true,
-        is_new: false,
+        is_new: d.is_new ?? false,
         rating: 0,
         reviews_count: 0,
         created_at: d.created_at ? d.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -250,6 +247,23 @@ function AdminProducts() {
   };
 
   const refresh = async () => { await fetchProducts(); };
+
+  // Badge « Nouveau » : simple mise en avant en boutique, pas de confirmation.
+  const toggleIsNew = async (id: string, next: boolean) => {
+    setTogglingNewId(id);
+    setList((prev) => prev.map((x) => (x.id === id ? { ...x, is_new: next } : x)));
+    try {
+      const { error } = await supabase.from("products").update({ is_new: next }).eq("id", id);
+      if (error) throw error;
+      toast.success(next ? "Badge « Nouveau » activé." : "Badge « Nouveau » retiré.");
+    } catch (err) {
+      console.error("toggle is_new", err);
+      setList((prev) => prev.map((x) => (x.id === id ? { ...x, is_new: !next } : x)));
+      toast.error("Impossible de mettre à jour le badge « Nouveau ».");
+    } finally {
+      setTogglingNewId(null);
+    }
+  };
 
   // image à afficher en priorité: celle marquée is_main, sinon la première par position
   const mainImage = (images: ProductImage[]) =>
@@ -317,6 +331,7 @@ function AdminProducts() {
         has_variants: draft.variants.length > 0,
         stock_quantity: computedGlobalStock,
         is_active: draft.is_active,
+        is_new: draft.is_new ?? false,
       };
       if (!productId) {
         const { data, error } = await supabase.from("products").insert(productPayload).select().single();
@@ -742,6 +757,7 @@ function AdminProducts() {
                 </button>
               </TableHead>
               <TableHead>Variantes</TableHead>
+              <TableHead>Nouveau</TableHead>
               <TableHead>Actif</TableHead>
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
@@ -749,7 +765,7 @@ function AdminProducts() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-16 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-16 text-center text-muted-foreground">
                   <div className="flex items-center justify-center">
                     <Spinner showLabel />
                   </div>
@@ -757,7 +773,7 @@ function AdminProducts() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-16 text-center">
+                <TableCell colSpan={8} className="py-16 text-center">
                   <Package className="mx-auto h-8 w-8 text-muted-foreground" />
                   <p className="mt-2 text-muted-foreground">Aucun produit trouvé.</p>
                 </TableCell>
@@ -797,6 +813,15 @@ function AdminProducts() {
                   </TableCell>
                   <TableCell className={p.stock === 0 ? "font-semibold text-destructive" : ""}>{p.stock}</TableCell>
                   <TableCell className="text-muted-foreground">{p.variants.length}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={!!p.is_new}
+                      disabled={togglingNewId === p.id}
+                      onCheckedChange={(next) => toggleIsNew(p.id, next)}
+                      aria-label={p.is_new ? "Retirer le badge Nouveau" : "Afficher le badge Nouveau"}
+                      className="data-[state=checked]:bg-accent-strong"
+                    />
+                  </TableCell>
                   <TableCell>
                         <Switch
                           checked={!!p.is_active}
@@ -1214,7 +1239,7 @@ function AdminProducts() {
                   {viewProduct.short_description && (
                     <p className="text-muted-foreground">{viewProduct.short_description}</p>
                   )}
-                  {viewProduct.description && <p className="text-foreground">{viewProduct.description}</p>}
+                  {viewProduct.description && <RichText value={viewProduct.description} className="text-foreground" />}
                 </div>
               )}
 
@@ -1359,7 +1384,7 @@ function AdminProducts() {
             <ProductGeneral
               draft={draft}
               setDraft={(p) => setDraft(p)}
-              categoriesMap={categoriesMap}
+              categories={categoriesList}
               showRequiredErrors={showRequiredErrors}
             />
           </TabsContent>

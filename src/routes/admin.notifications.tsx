@@ -14,7 +14,7 @@ export const Route = createFileRoute("/admin/notifications")({
 
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 
-export default function AdminNotifications() {
+function AdminNotifications() {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
 

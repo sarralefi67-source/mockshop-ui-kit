@@ -194,7 +194,7 @@ function CategoryPage() {
 
         <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-extrabold">{category.name}</h1>
+            <h1 className="page-title text-3xl">{category.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {filtered.length} produit{filtered.length > 1 ? "s" : ""} disponible
               {filtered.length > 1 ? "s" : ""}

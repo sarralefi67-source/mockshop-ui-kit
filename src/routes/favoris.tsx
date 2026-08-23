@@ -45,7 +45,7 @@ function FavorisPage() {
   return (
     <StoreLayout>
       <div className="container-page py-10">
-        <h1 className="text-3xl font-extrabold">Mes favoris</h1>
+        <h1 className="page-title text-3xl">Mes favoris</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {liked.length} produit{liked.length > 1 ? "s" : ""} enregistré{liked.length > 1 ? "s" : ""}
         </p>

@@ -56,7 +56,7 @@ function LoadingTableRow() {
   );
 }
 
-export default function AdminNewsletter() {
+function AdminNewsletter() {
   const [subs, setSubs] = useState<Subscriber[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");

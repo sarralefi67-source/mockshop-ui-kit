@@ -51,7 +51,7 @@ type ReviewRow = {
   created_at?: string | null;
 };
 
-export default function AdminAvis() {
+function AdminAvis() {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");

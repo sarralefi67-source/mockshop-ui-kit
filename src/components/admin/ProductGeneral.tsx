@@ -1,20 +1,20 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { CategoryCombobox, type CategoryOption } from "@/components/admin/CategoryCombobox";
+import { DescriptionEditor } from "@/components/admin/DescriptionEditor";
 import type { Product } from "@/types";
 
 export default function ProductGeneral({
   draft,
   setDraft,
-  categoriesMap,
+  categories,
   showRequiredErrors,
 }: {
   draft: Product;
   setDraft: (p: Product) => void;
-  categoriesMap: Record<string, string>;
+  categories: CategoryOption[];
   showRequiredErrors: boolean;
 }) {
   return (
@@ -35,14 +35,13 @@ export default function ProductGeneral({
      
       <div className="space-y-2">
           <Label htmlFor="product-category">Catégorie *</Label>
-          <Select value={(draft.category_id ?? "") as string} onValueChange={(v) => setDraft({ ...draft, category_id: v || null })}>
-            <SelectTrigger id="product-category"><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
-          <SelectContent className="max-h-72">
-            {Object.entries(categoriesMap).map(([id, name]) => (
-              <SelectItem key={id} value={id}>{name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <CategoryCombobox
+            id="product-category"
+            categories={categories}
+            value={draft.category_id}
+            onChange={(categoryId) => setDraft({ ...draft, category_id: categoryId })}
+            invalid={showRequiredErrors && !draft.category_id}
+          />
           {showRequiredErrors && !draft.category_id && (
             <p className="text-xs text-destructive">La catégorie est obligatoire.</p>
           )}
@@ -100,8 +99,13 @@ export default function ProductGeneral({
         )}
       </div>
       <div className="space-y-2 sm:col-span-2">
-        <Label>Description</Label>
-        <Textarea rows={4} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        <Label htmlFor="product-description">Description</Label>
+        <DescriptionEditor
+          id="product-description"
+          rows={6}
+          value={draft.description}
+          onChange={(description) => setDraft({ ...draft, description })}
+        />
       </div>
       <div className="flex items-center gap-3">
         <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />

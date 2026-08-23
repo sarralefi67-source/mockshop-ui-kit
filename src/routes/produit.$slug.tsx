@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { RichText } from "@/components/ui/rich-text";
 
 type LiveReview = { id: string; rating: number; comment: string | null; created_at: string | null; user_id: string | null; is_approved: boolean | null };
 
@@ -66,7 +67,7 @@ export const Route = createFileRoute("/produit/$slug")({
 function ProductPage() {
   const { product } = Route.useLoaderData();
   const { addItem, toggleWishlist, isWishlisted } = useStore();
-  const { user } = useAuth();
+  const { user, openAuth } = useAuth();
 
   const [selection, setSelection] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -331,7 +332,7 @@ function ProductPage() {
             <p className="mt-4 text-muted-foreground">{product.short_description}</p>
 
             <div className="mt-6 flex items-baseline gap-3">
-              <span className={cn("text-3xl font-extrabold", onSale ? "text-destructive" : "")}>
+              <span className={cn("font-display text-3xl font-semibold", onSale ? "text-accent-strong" : "")}>
                 {formatPrice(price)}
               </span>
               {onSale && (
@@ -457,7 +458,7 @@ function ProductPage() {
           </TabsList>
 
           <TabsContent value="description" className="max-w-3xl pt-6 text-muted-foreground">
-            <p>{product.description}</p>
+            <RichText value={product.description} />
           </TabsContent>
 
           <TabsContent value="specs" className="max-w-3xl pt-6">
@@ -465,7 +466,6 @@ function ProductPage() {
               {[
                 ["Marque", product.brand],
                 ["Référence", variant?.sku ?? product.sku],
-                ["Garantie", "12 mois"],
                 ...product.attributes.map(
                   (a) => [a.name, a.values.map((v) => v.label).join(", ")] as [string, string],
                 ),
@@ -481,9 +481,9 @@ function ProductPage() {
           <TabsContent value="avis" className="max-w-3xl pt-6">
             {!user ? (
               <div className="mb-6 rounded-xl border border-border bg-surface p-4 text-sm">
-                <Link to="/connexion" search={{ redirect: `/produit/${product.slug}` }} className="font-semibold text-accent-strong hover:underline">
+                <button type="button" onClick={() => openAuth("signin")} className="font-semibold text-accent-strong hover:underline">
                   Connectez-vous
-                </Link>{" "}
+                </button>{" "}
                 pour laisser un avis sur ce produit.
               </div>
             ) : myReview ? (
@@ -543,7 +543,7 @@ function ProductPage() {
         {related.length > 0 && (
           <section className="mt-14">
             <Separator className="mb-8" />
-            <h2 className="text-2xl font-bold">Produits liés</h2>
+            <h2 className="section-title">Produits liés</h2>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {related.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>

@@ -42,7 +42,7 @@ function PromotionsPage() {
     <StoreLayout>
       <div className="border-b border-border bg-surface">
         <div className="container-page py-10">
-          <h1 className="text-3xl font-extrabold">Promotions</h1>
+          <h1 className="page-title text-3xl">Promotions</h1>
           <p className="mt-2 text-muted-foreground">
             {promos.length} produits en réduction — offres limitées dans le temps.
           </p>

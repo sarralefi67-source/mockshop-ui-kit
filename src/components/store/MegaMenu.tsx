@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buildCategoryTree } from "@/data/categories";
+import { isOnSale } from "@/data/products";
 import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import type { CategoryNode } from "@/types";
@@ -9,6 +10,8 @@ import type { CategoryNode } from "@/types";
 export function MegaMenu() {
   const [open, setOpen] = useState<string | null>(null);
   const [tree, setTree] = useState<CategoryNode[]>([]);
+  // Le bouton « Promotions » n'a de sens que s'il y a effectivement des remises.
+  const [hasPromos, setHasPromos] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -29,7 +32,9 @@ export function MegaMenu() {
           .filter((node) => visibleCategoryIds.has(node.id))
           .map((node) => ({ ...node, children: filterTree(node.children) }));
 
-        if (mounted) setTree(filterTree(buildCategoryTree(categories)));
+        if (!mounted) return;
+        setTree(filterTree(buildCategoryTree(categories)));
+        setHasPromos(products.some(isOnSale));
       })
       .catch((err) => console.error("load mega menu categories", err));
     return () => {
@@ -41,8 +46,8 @@ export function MegaMenu() {
   const remainingCategories = tree.slice(8);
 
   return (
-    <nav className="relative hidden lg:block border-t border-border bg-card">
-      <div className="container-page flex items-center gap-1" onMouseLeave={() => setOpen(null)}>
+    <nav className="relative hidden border-y border-border/70 bg-card lg:block">
+      <div className="container-page flex items-center gap-2" onMouseLeave={() => setOpen(null)}>
         {visibleCategories.map((cat: CategoryNode) => (
           <div key={cat.id} className="static">
             <Link
@@ -50,8 +55,9 @@ export function MegaMenu() {
               params={{ slug: cat.slug }}
               onMouseEnter={() => setOpen(cat.id)}
               className={cn(
-                "flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-semibold transition-colors",
-                open === cat.id ? "text-accent-strong" : "text-foreground hover:text-accent-strong",
+                "relative flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-4 text-[15px] font-semibold transition-colors",
+                "after:absolute after:inset-x-4 after:bottom-2.5 after:h-0.5 after:origin-left after:scale-x-0 after:bg-accent-strong after:transition-transform hover:after:scale-x-100",
+                open === cat.id ? "text-accent-strong after:scale-x-100" : "text-foreground hover:text-accent-strong",
               )}
             >
               {/* {cat.image_url && (
@@ -63,14 +69,15 @@ export function MegaMenu() {
 
             {open === cat.id && cat.children.length > 0 && (
               <div className="absolute inset-x-0 top-full z-40 border-b border-border bg-card shadow-pop">
-                <div className="container-page grid grid-cols-4 gap-8 py-8">
+                <div className="container-page grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+                  <div className="grid grid-cols-3 gap-x-8 gap-y-6">
                   {(cat.children as CategoryNode[]).map((sub: CategoryNode) => (
                     <div key={sub.id}>
                       <Link
                         to="/categorie/$slug"
                         params={{ slug: sub.slug }}
                         onClick={() => setOpen(null)}
-                        className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-foreground hover:text-accent-strong"
+                        className="flex items-center gap-2 border-b border-border/70 pb-2 font-display text-sm font-semibold text-foreground transition-colors hover:text-accent-strong"
                       >
                         {sub.image_url && (
                           <img src={sub.image_url} alt="" className="h-8 w-8 rounded-md object-cover" />
@@ -90,37 +97,61 @@ export function MegaMenu() {
                             </Link>
                           </li>
                         ))}
-                        {sub.children.length === 0 && (
+                        {/* {sub.children.length === 0 && (
                           <li className="text-xs text-muted-foreground">Bientôt disponible</li>
-                        )}
+                        )} */}
                       </ul>
                     </div>
                   ))}
+                  </div>
+
+                  {/* Visuel de la catégorie : toujours dans la colonne de droite,
+                      quel que soit le nombre de sous-catégories. */}
                   <Link
                     to="/categorie/$slug"
                     params={{ slug: cat.slug }}
                     onClick={() => setOpen(null)}
-                    className="group relative col-span-1 overflow-hidden rounded-lg bg-surface p-5"
+                    className="group relative flex min-h-56 flex-col justify-end overflow-hidden rounded-lg bg-surface p-5"
                   >
                     {cat.image_url && (
-                      <img
-                        src={cat.image_url}
-                        alt=""
-                        className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
+                      <>
+                        <img
+                          src={cat.image_url}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-0 bg-gradient-to-t from-foreground/85 via-foreground/45 to-foreground/5"
+                        />
+                      </>
                     )}
-                    <div className={cn("relative", cat.image_url && "bg-gradient-to-t from-foreground/70 via-foreground/10 to-transparent -m-5 p-5 h-full")}>
-                      <p className={cn("text-xs font-semibold uppercase tracking-wide", cat.image_url ? "text-background/90" : "text-accent-strong")}>
+                    <span className="relative block">
+                      <span className={cn(
+                        "block text-xs font-semibold uppercase tracking-[0.1em]",
+                        cat.image_url ? "text-background/85" : "text-accent-strong",
+                      )}>
                         Sélection
-                      </p>
-                      <p className={cn("mt-2 text-sm font-semibold", cat.image_url && "text-background")}>{cat.name} en promo</p>
-                      <p className={cn("mt-1 text-sm", cat.image_url ? "text-background/80" : "text-muted-foreground")}>
+                      </span>
+                      <span className={cn(
+                        "mt-1 block font-display text-base font-semibold",
+                        cat.image_url ? "text-background" : "text-foreground",
+                      )}>
+                        {cat.name}
+                      </span>
+                      <span className={cn(
+                        "mt-1 line-clamp-2 block text-sm",
+                        cat.image_url ? "text-background/80" : "text-muted-foreground",
+                      )}>
                         {cat.description ?? "Nos meilleures offres du moment."}
-                      </p>
-                      <span className={cn("mt-4 inline-block text-sm font-semibold hover:underline", cat.image_url ? "text-background" : "text-accent-strong")}>
+                      </span>
+                      <span className={cn(
+                        "mt-3 inline-block text-sm font-semibold group-hover:underline",
+                        cat.image_url ? "text-background" : "text-accent-strong",
+                      )}>
                         Voir tout →
                       </span>
-                    </div>
+                    </span>
                   </Link>
                 </div>
               </div>
@@ -134,7 +165,7 @@ export function MegaMenu() {
               onMouseEnter={() => setOpen("more")}
               aria-label="Voir les autres catégories"
               className={cn(
-                "flex items-center gap-1 px-4 py-3 text-sm font-semibold transition-colors",
+                "flex items-center gap-1 px-4 py-4 text-[15px] font-semibold transition-colors",
                 open === "more" ? "text-accent-strong" : "text-foreground hover:text-accent-strong",
               )}
             >
@@ -160,12 +191,14 @@ export function MegaMenu() {
             )}
           </div>
         )}
-        <Link
-          to="/promotions"
-          className="ml-auto px-4 py-3 text-sm font-semibold text-accent-strong hover:underline"
-        >
-          Promotions
-        </Link>
+        {hasPromos && (
+          <Link
+            to="/promotions"
+            className="my-2 ml-auto rounded-md bg-accent-strong px-4 py-2 text-[13px] font-bold uppercase tracking-[0.08em] text-accent-strong-foreground transition-colors hover:bg-deep"
+          >
+            Promotions
+          </Link>
+        )}
       </div>
     </nav>
   );

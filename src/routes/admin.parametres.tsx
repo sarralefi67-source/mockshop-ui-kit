@@ -28,7 +28,7 @@ type ShippingRate = {
 
 const emptyRate: Partial<ShippingRate> = { governorate: "", price: 0, is_active: true };
 
-export default function AdminParametres() {
+function AdminParametres() {
   const [rates, setRates] = useState<ShippingRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState<Partial<ShippingRate> | null>(null);

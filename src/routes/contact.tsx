@@ -27,7 +27,7 @@ function ContactPage() {
     <StoreLayout>
       <div className="container-page grid gap-10 py-12 md:grid-cols-2">
         <div>
-          <h1 className="text-3xl font-extrabold">Contactez-nous</h1>
+          <h1 className="page-title text-3xl">Contactez-nous</h1>
           <p className="mt-3 text-muted-foreground">
             Notre service client est disponible du lundi au samedi, de 9h à 18h.
           </p>

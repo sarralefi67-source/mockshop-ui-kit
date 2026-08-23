@@ -22,11 +22,11 @@ export const Route = createFileRoute("/admin/banners")({
 type BannerRow = Database["public"]["Tables"]["banners"]["Row"];
 type BannerDraft = Partial<BannerRow> & { product_ids?: string[] };
 
-const bannerLink = (title: string | null | undefined, productIds: string[] = [], products: { id: string; slug?: string | null }[] = []) => {
-  const selectedProduct = products.find((product) => product.id === productIds[0]);
-  if (selectedProduct?.slug) return `/produit/${selectedProduct.slug}`;
-  return title?.trim() ? "/promotions" : "/promotions";
-};
+// Une bannière renvoie vers sa propre page, qui liste les produits associés
+// (voir src/routes/banniere.$id.tsx). L'id n'existe qu'après la création, d'où
+// le link_url renseigné dans un second temps pour une nouvelle bannière.
+const bannerLink = (bannerId: string | null | undefined) =>
+  bannerId ? `/banniere/${bannerId}` : "";
 
 const emptyBanner: BannerDraft = {
   title: "",
@@ -37,7 +37,7 @@ const emptyBanner: BannerDraft = {
   product_ids: [],
 };
 
-export default function AdminBanners() {
+function AdminBanners() {
   const [banners, setBanners] = useState<BannerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState<BannerDraft | null>(null);
@@ -85,20 +85,31 @@ export default function AdminBanners() {
         title: draft.title?.trim() || null,
         subtitle: draft.subtitle?.trim() || null,
         image_url: draft.image_url,
-        link_url: bannerLink(draft.title, draft.product_ids, products),
         is_active: draft.is_active ?? true,
       };
       if (draft.id) {
-        const { error } = await supabase.from("banners").update(payload).eq("id", draft.id);
+        const { error } = await supabase
+          .from("banners")
+          .update({ ...payload, link_url: bannerLink(draft.id) })
+          .eq("id", draft.id);
         if (error) throw error;
+        await saveBannerProducts(draft.id, draft.product_ids ?? []);
         toast.success("Bannière mise à jour.");
-        } else {
-          const { data: created, error } = await supabase.from("banners").insert({ ...payload, position: banners.length }).select("id").single();
+      } else {
+        const { data: created, error } = await supabase
+          .from("banners")
+          .insert({ ...payload, link_url: null, position: banners.length })
+          .select("id")
+          .single();
         if (error) throw error;
-          await saveBannerProducts(created.id, draft.product_ids ?? []);
+        const { error: linkError } = await supabase
+          .from("banners")
+          .update({ link_url: bannerLink(created.id) })
+          .eq("id", created.id);
+        if (linkError) throw linkError;
+        await saveBannerProducts(created.id, draft.product_ids ?? []);
         toast.success("Bannière créée.");
       }
-        if (draft.id) await saveBannerProducts(draft.id, draft.product_ids ?? []);
       setDraft(null);
       await load();
     } catch (err) {
@@ -275,7 +286,13 @@ export default function AdminBanners() {
               </div>
               <div className="space-y-2">
                 <Label>Lien automatique</Label>
-                <Input value={bannerLink(draft.title, draft.product_ids, products)} readOnly />
+                <Input
+                  value={bannerLink(draft.id) || "Généré à la création de la bannière"}
+                  readOnly
+                />
+                <p className="text-xs text-muted-foreground">
+                  Un clic sur la bannière ouvre cette page, qui affiche les produits associés ci-dessous.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Produits associés</Label>

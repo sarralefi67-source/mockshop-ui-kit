@@ -9,18 +9,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        // Gamme terre cuite : terracotta <-> brun profond au survol.
+        default: "bg-primary text-primary-foreground hover:bg-accent-strong",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-deep",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        accent:
-          "bg-accent-strong text-accent-strong-foreground shadow-sm hover:bg-accent-strong/90",
+          "border border-input bg-background hover:border-accent-strong hover:text-accent-strong",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-strong",
+        ghost: "hover:bg-accent hover:text-accent-strong",
+        link: "text-accent-strong underline-offset-4 hover:underline",
+        accent: "bg-accent-strong text-accent-strong-foreground hover:bg-deep",
         accentOutline:
-          "border border-accent-strong/40 text-accent-strong bg-transparent hover:bg-accent-strong/10",
-        subtle: "bg-surface text-foreground hover:bg-secondary",
+          "border border-accent-strong text-accent-strong bg-transparent hover:bg-accent-strong hover:text-accent-strong-foreground",
+        subtle: "bg-accent text-accent-foreground hover:bg-accent-strong hover:text-accent-strong-foreground",
         online: "text-green-600 hover:bg-green-50 hover:text-green-700",
       },
       size: {

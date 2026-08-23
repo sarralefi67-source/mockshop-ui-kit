@@ -41,6 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { randomUUID } from "@/lib/uid";
 import {
   Pagination,
   PaginationContent,
@@ -1001,7 +1002,7 @@ function AdminCategories() {
      * IMPORTANT:
      * A root category MUST have parent_id = null.
      */
-    const categoryId = draft.id || crypto.randomUUID();
+    const categoryId = draft.id || randomUUID();
     const parentId = draft.parent_id || categoryId;
 
     const slug = slugify(draft.name);

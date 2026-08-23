@@ -125,9 +125,14 @@ function mapProductRow(row: any, promoByProduct: PromoMap, reviewStats: ReviewSt
     stock: row.stock_quantity ?? 0,
     sku: row.sku ?? "",
     is_active: row.is_active ?? true,
-    is_new: row.created_at
-      ? (Date.now() - new Date(row.created_at).getTime()) / 86_400_000 <= NEW_WINDOW_DAYS
-      : false,
+    // Le badge « Nouveau » se pilote depuis /admin/produits (products.is_new,
+    // cf. database/products-is-new.sql). Tant que la colonne n'existe pas en
+    // base, on retombe sur l'ancienne règle des 30 jours glissants.
+    is_new: typeof row.is_new === "boolean"
+      ? row.is_new
+      : row.created_at
+        ? (Date.now() - new Date(row.created_at).getTime()) / 86_400_000 <= NEW_WINDOW_DAYS
+        : false,
     rating: stats?.avg ?? 0,
     reviews_count: stats?.count ?? 0,
     created_at: row.created_at ?? new Date().toISOString(),
@@ -229,14 +234,75 @@ export type Banner = {
   image_url: string;
   link_url: string | null;
   position: number;
+  /** How many products are attached to the banner (see admin/banners "Produits associés"). */
+  products_count: number;
 };
+
+const BANNER_SELECT = "id, title, subtitle, image_url, link_url, position";
+
+/** Product counts per banner. Best-effort: a failure must never hide the hero carousel. */
+async function fetchBannerProductCounts(bannerIds: string[]): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (bannerIds.length === 0) return counts;
+  const { data, error } = await supabase
+    .from("banner_products")
+    .select("banner_id")
+    .in("banner_id", bannerIds);
+  if (error) {
+    console.error("load banner product counts", error);
+    return counts;
+  }
+  (data ?? []).forEach((row: any) => {
+    counts.set(row.banner_id, (counts.get(row.banner_id) ?? 0) + 1);
+  });
+  return counts;
+}
 
 export async function fetchActiveBanners(): Promise<Banner[]> {
   const { data, error } = await supabase
     .from("banners")
-    .select("id, title, subtitle, image_url, link_url, position")
+    .select(BANNER_SELECT)
     .eq("is_active", true)
     .order("position", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  const rows = (data ?? []) as any[];
+  const counts = await fetchBannerProductCounts(rows.map((b) => b.id));
+  return rows.map((b) => ({ ...b, products_count: counts.get(b.id) ?? 0 }));
+}
+
+/** Single active banner by id, or null if not found/inactive. */
+export async function fetchBannerById(id: string): Promise<Banner | null> {
+  const { data, error } = await supabase
+    .from("banners")
+    .select(BANNER_SELECT)
+    .eq("id", id)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const counts = await fetchBannerProductCounts([id]);
+  return { ...(data as any), products_count: counts.get(id) ?? 0 };
+}
+
+/** Active products attached to a banner, in the order configured in the admin. */
+export async function fetchBannerProducts(bannerId: string): Promise<Product[]> {
+  const { data: links, error: linksError } = await supabase
+    .from("banner_products")
+    .select("product_id, position")
+    .eq("banner_id", bannerId)
+    .order("position", { ascending: true });
+  if (linksError) throw linksError;
+  const ids = (links ?? []).map((row: any) => row.product_id as string);
+  if (ids.length === 0) return [];
+
+  const [{ data, error }, promoByProduct, reviewStats] = await Promise.all([
+    supabase.from("products").select(PRODUCT_SELECT).in("id", ids).eq("is_active", true),
+    fetchPromoMap(),
+    fetchReviewStats(ids),
+  ]);
+  if (error) throw error;
+  const rank = new Map(ids.map((id, i) => [id, i]));
+  return (data ?? [])
+    .map((row: any) => mapProductRow(row, promoByProduct, reviewStats))
+    .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 }
