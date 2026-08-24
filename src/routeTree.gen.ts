@@ -18,7 +18,9 @@ import { Route as ConnexionRouteImport } from './routes/connexion'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FavorisRouteImport } from './routes/favoris'
 import { Route as InscriptionRouteImport } from './routes/inscription'
+import { Route as MotDePasseOublieRouteImport } from './routes/mot-de-passe-oublie'
 import { Route as PromotionsRouteImport } from './routes/promotions'
+import { Route as ReinitialiserMotDePasseRouteImport } from './routes/reinitialiser-mot-de-passe'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAvisRouteImport } from './routes/admin.avis'
 import { Route as AdminBannersRouteImport } from './routes/admin.banners'
@@ -84,9 +86,19 @@ const InscriptionRoute = InscriptionRouteImport.update({
   path: '/inscription',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MotDePasseOublieRoute = MotDePasseOublieRouteImport.update({
+  id: '/mot-de-passe-oublie',
+  path: '/mot-de-passe-oublie',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PromotionsRoute = PromotionsRouteImport.update({
   id: '/promotions',
   path: '/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReinitialiserMotDePasseRoute = ReinitialiserMotDePasseRouteImport.update({
+  id: '/reinitialiser-mot-de-passe',
+  path: '/reinitialiser-mot-de-passe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -195,7 +207,9 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/promotions': typeof PromotionsRoute
+  '/reinitialiser-mot-de-passe': typeof ReinitialiserMotDePasseRoute
   '/admin/avis': typeof AdminAvisRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -224,7 +238,9 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/promotions': typeof PromotionsRoute
+  '/reinitialiser-mot-de-passe': typeof ReinitialiserMotDePasseRoute
   '/admin/avis': typeof AdminAvisRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -256,7 +272,9 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/inscription': typeof InscriptionRoute
+  '/mot-de-passe-oublie': typeof MotDePasseOublieRoute
   '/promotions': typeof PromotionsRoute
+  '/reinitialiser-mot-de-passe': typeof ReinitialiserMotDePasseRoute
   '/admin/avis': typeof AdminAvisRoute
   '/admin/banners': typeof AdminBannersRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -289,7 +307,9 @@ export interface FileRouteTypes {
     | '/contact'
     | '/favoris'
     | '/inscription'
+    | '/mot-de-passe-oublie'
     | '/promotions'
+    | '/reinitialiser-mot-de-passe'
     | '/admin/avis'
     | '/admin/banners'
     | '/admin/categories'
@@ -318,7 +338,9 @@ export interface FileRouteTypes {
     | '/contact'
     | '/favoris'
     | '/inscription'
+    | '/mot-de-passe-oublie'
     | '/promotions'
+    | '/reinitialiser-mot-de-passe'
     | '/admin/avis'
     | '/admin/banners'
     | '/admin/categories'
@@ -349,7 +371,9 @@ export interface FileRouteTypes {
     | '/contact'
     | '/favoris'
     | '/inscription'
+    | '/mot-de-passe-oublie'
     | '/promotions'
+    | '/reinitialiser-mot-de-passe'
     | '/admin/avis'
     | '/admin/banners'
     | '/admin/categories'
@@ -381,7 +405,9 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   FavorisRoute: typeof FavorisRoute
   InscriptionRoute: typeof InscriptionRoute
+  MotDePasseOublieRoute: typeof MotDePasseOublieRoute
   PromotionsRoute: typeof PromotionsRoute
+  ReinitialiserMotDePasseRoute: typeof ReinitialiserMotDePasseRoute
   BanniereIdRoute: typeof BanniereIdRoute
   CategorieSlugRoute: typeof CategorieSlugRoute
   PagesSlugRoute: typeof PagesSlugRoute
@@ -453,11 +479,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InscriptionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mot-de-passe-oublie': {
+      id: '/mot-de-passe-oublie'
+      path: '/mot-de-passe-oublie'
+      fullPath: '/mot-de-passe-oublie'
+      preLoaderRoute: typeof MotDePasseOublieRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/promotions': {
       id: '/promotions'
       path: '/promotions'
       fullPath: '/promotions'
       preLoaderRoute: typeof PromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reinitialiser-mot-de-passe': {
+      id: '/reinitialiser-mot-de-passe'
+      path: '/reinitialiser-mot-de-passe'
+      fullPath: '/reinitialiser-mot-de-passe'
+      preLoaderRoute: typeof ReinitialiserMotDePasseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -653,7 +693,9 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   FavorisRoute: FavorisRoute,
   InscriptionRoute: InscriptionRoute,
+  MotDePasseOublieRoute: MotDePasseOublieRoute,
   PromotionsRoute: PromotionsRoute,
+  ReinitialiserMotDePasseRoute: ReinitialiserMotDePasseRoute,
   BanniereIdRoute: BanniereIdRoute,
   CategorieSlugRoute: CategorieSlugRoute,
   PagesSlugRoute: PagesSlugRoute,

@@ -10,10 +10,7 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
-    meta: [
-      { title: "Admin Login — Artisanat" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Admin Login — Artisanat" }, { name: "robots", content: "noindex" }],
   }),
   component: AdminLogin,
 });
@@ -42,7 +39,17 @@ function AdminLogin() {
       toast.success("Un e-mail de réinitialisation vous a été envoyé.");
     } catch (err) {
       console.error("admin password reset", err);
-      toast.error("Impossible d'envoyer l'e-mail de réinitialisation.");
+      const rawMessage = String((err as { message?: string })?.message ?? "").toLowerCase();
+      const isRateLimited =
+        (err as { status?: number })?.status === 429 ||
+        rawMessage.includes("rate limit") ||
+        rawMessage.includes("too many") ||
+        rawMessage.includes("over_email_send_rate_limit");
+      toast.error(
+        isRateLimited
+          ? "Trop de demandes d’e-mail ont été envoyées récemment. Attendez quelques minutes avant de réessayer."
+          : "Impossible d’envoyer l’e-mail de réinitialisation pour le moment. Vérifiez l’adresse, puis réessayez.",
+      );
     } finally {
       setResettingPassword(false);
     }
@@ -92,11 +99,18 @@ function AdminLogin() {
       <div className="w-full max-w-md">
         <div className="rounded-xl border border-border bg-card p-6">
           <h1 className="text-2xl font-bold">Connexion administrateur</h1>
-          <p className="text-sm text-muted-foreground mt-1">Veuillez vous connecter avec un compte administrateur.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Veuillez vous connecter avec un compte administrateur.
+          </p>
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <div>
               <Label>Adresse e-mail</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+              />
             </div>
             <div>
               <div className="flex items-center justify-between">
@@ -122,7 +136,9 @@ function AdminLogin() {
                 <button
                   type="button"
                   onClick={() => setPasswordVisible((visible) => !visible)}
-                  aria-label={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={
+                    passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"
+                  }
                   className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
                 >
                   {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -130,8 +146,12 @@ function AdminLogin() {
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <Button type="submit" variant="accent" disabled={loading}>{loading ? "Connexion…" : "Se connecter"}</Button>
-              <a href="/" className="text-sm text-muted-foreground hover:text-accent-strong">Retour à la boutique</a>
+              <Button type="submit" variant="accent" disabled={loading}>
+                {loading ? "Connexion…" : "Se connecter"}
+              </Button>
+              <a href="/" className="text-sm text-muted-foreground hover:text-accent-strong">
+                Retour à la boutique
+              </a>
             </div>
           </form>
         </div>

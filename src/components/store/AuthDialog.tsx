@@ -8,7 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 
 /**
@@ -76,7 +80,8 @@ export function AuthDialog() {
         .from("newsletter_subscribers")
         .insert({ email })
         .then(({ error: newsletterError }) => {
-          if (newsletterError) console.warn("newsletter subscribe on signup failed:", newsletterError);
+          if (newsletterError)
+            console.warn("newsletter subscribe on signup failed:", newsletterError);
         });
     }
     finish("Compte créé : vérifiez votre e-mail si une confirmation est requise.");
@@ -206,6 +211,16 @@ export function AuthDialog() {
             <Button variant="accent" size="lg" type="submit" className="w-full" disabled={loading}>
               {loading ? "Connexion…" : "Se connecter"}
             </Button>
+            <button
+              type="button"
+              className="block w-full text-center text-sm font-semibold text-accent-strong hover:underline"
+              onClick={() => {
+                closeAuth();
+                navigate({ to: "/mot-de-passe-oublie" });
+              }}
+            >
+              Mot de passe oublié ?
+            </button>
             <p className="text-center text-sm text-muted-foreground">
               Pas encore de compte ?{" "}
               <button
