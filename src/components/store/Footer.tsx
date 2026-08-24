@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
 export function Footer() {
   const [email, setEmail] = useState("");
+  const { settings } = useSiteSettings();
 
   return (
     <footer className="weave-texture mt-16 bg-deep text-deep-foreground/80">
@@ -39,9 +41,25 @@ export function Footer() {
             vous, payés à la livraison.
           </p>
           <ul className="mt-4 space-y-2 text-sm text-deep-foreground/70">
-            <li className="flex items-center gap-2"><Phone className="h-4 w-4" /> +216 71 000 000</li>
-            <li className="flex items-center gap-2"><Mail className="h-4 w-4" /> contact@Artisanat.tn</li>
-            <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> Avenue Habib Bourguiba, Tunis</li>
+            {settings?.phone && (
+              <li className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                <a href={`tel:${settings.phone.replace(/\s+/g, "")}`} className="transition-colors hover:text-ocre">
+                  {settings.phone}
+                </a>
+              </li>
+            )}
+            {settings?.email && (
+              <li className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <a href={`mailto:${settings.email}`} className="transition-colors hover:text-ocre">
+                  {settings.email}
+                </a>
+              </li>
+            )}
+            {settings?.address && (
+              <li className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {settings.address}</li>
+            )}
           </ul>
         </div>
 
@@ -50,12 +68,14 @@ export function Footer() {
         <div>
           <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Informations</h3>
           <ul className="mt-4 space-y-2">
-            <li><Link to="/pages/$slug" params={{ slug: "cgv" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGV</Link></li>
+            {/* <li><Link to="/pages/$slug" params={{ slug: "cgv" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGV</Link></li>
             <li><Link to="/pages/$slug" params={{ slug: "cgu" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGU</Link></li>
-            <li><Link to="/pages/$slug" params={{ slug: "mentions-legales" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Mentions légales</Link></li>
-            <li><Link to="/pages/$slug" params={{ slug: "livraison" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Livraison & retours</Link></li>
-            <li><Link to="/contact" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Contact</Link></li>
-            <li><Link to="/admin" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Back-office</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "mentions-legales" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Mentions légales</Link></li> */}
+            <li><Link to="/pages/$slug" params={{ slug: "confidentialite" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Politique de confidentialité</Link></li>
+            <li><Link to="/pages/$slug" params={{ slug: "remboursement" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Politique de remboursement</Link></li>
+            {/* <li><Link to="/pages/$slug" params={{ slug: "livraison" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Livraison & retours</Link></li> */}
+            {/* <li><Link to="/contact" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Contact</Link></li>
+            <li><Link to="/admin" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Back-office</Link></li> */}
           </ul>
         </div>
 

@@ -53,7 +53,10 @@ function CategoryPage() {
   const category = findCategoryBySlug(slug, categories)!;
   const ids = useMemo(() => categoryWithDescendants(category.id, categories), [category.id, categories]);
   const path = categoryPath(category.id, categories);
-  const subCategories = categories.filter((c) => c.parent_id === category.id);
+  const subCategories = useMemo(
+    () => categories.filter((c) => c.parent_id === category.id),
+    [categories, category.id],
+  );
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +88,7 @@ function CategoryPage() {
 
   const [priceRange, setPriceRange] = useState<number[]>([0, maxPrice]);
   const [brands, setBrands] = useState<string[]>([]);
+  const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [sort, setSort] = useState("popularite");
@@ -93,15 +97,44 @@ function CategoryPage() {
   useEffect(() => {
     setPriceRange([0, maxPrice]);
     setBrands([]);
+    setSubCategoryIds([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, maxPrice]);
 
-  const availableBrands = [...new Set(base.map((p) => p.brand))];
+  // Les produits sans marque renseignée produisaient une case à cocher sans
+  // libellé : on ne propose que les marques réellement présentes.
+  const availableBrands = useMemo(
+    () =>
+      [...new Set(base.map((p) => p.brand.trim()).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b, "fr"),
+      ),
+    [base],
+  );
+
+  // Une sous-catégorie n'est proposée que si elle mène à au moins un produit,
+  // directement ou via ses propres descendantes.
+  const availableSubCategories = useMemo(
+    () =>
+      subCategories
+        .map((sub) => ({ category: sub, ids: categoryWithDescendants(sub.id, categories) }))
+        .filter(({ ids }) =>
+          allProducts.some((p) => p.category_id && ids.includes(p.category_id)),
+        ),
+    [subCategories, categories, allProducts],
+  );
+
+  // Cocher une sous-catégorie inclut toute sa descendance.
+  const allowedSubCategoryIds = useMemo(() => {
+    if (subCategoryIds.length === 0) return null;
+    return new Set(subCategoryIds.flatMap((id) => categoryWithDescendants(id, categories)));
+  }, [subCategoryIds, categories]);
 
   const filtered = useMemo(() => {
     const list = base.filter((p) => {
       if (p.price < (priceRange[0] ?? 0) || p.price > (priceRange[1] ?? maxPrice)) return false;
-      if (brands.length > 0 && !brands.includes(p.brand)) return false;
+      if (allowedSubCategoryIds && (!p.category_id || !allowedSubCategoryIds.has(p.category_id)))
+        return false;
+      if (brands.length > 0 && !brands.includes(p.brand.trim())) return false;
       if (inStockOnly && p.stock === 0) return false;
       if (onSaleOnly && !(p.compare_at_price && p.compare_at_price > p.price)) return false;
       return true;
@@ -113,7 +146,7 @@ function CategoryPage() {
       case "note": return [...list].sort((a, b) => b.rating - a.rating);
       default: return [...list].sort((a, b) => b.reviews_count - a.reviews_count);
     }
-  }, [base, priceRange, brands, inStockOnly, onSaleOnly, sort, maxPrice]);
+  }, [base, priceRange, brands, allowedSubCategoryIds, inStockOnly, onSaleOnly, sort, maxPrice]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -121,8 +154,29 @@ function CategoryPage() {
   const toggleBrand = (brand: string) =>
     setBrands((prev) => (prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]));
 
+  const toggleSubCategory = (id: string) =>
+    setSubCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   const filtersPanel = (
     <div className="space-y-7">
+      {availableSubCategories.length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wide">Sous-catégories</h3>
+          <ul className="mt-3 space-y-2">
+            {availableSubCategories.map(({ category: sub }) => (
+              <li key={sub.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={`sub-${sub.id}`}
+                  checked={subCategoryIds.includes(sub.id)}
+                  onCheckedChange={() => { toggleSubCategory(sub.id); setPage(1); }}
+                />
+                <Label htmlFor={`sub-${sub.id}`} className="text-sm font-normal">{sub.name}</Label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div>
         <h3 className="text-sm font-bold uppercase tracking-wide">Prix</h3>
         <Slider
@@ -138,18 +192,19 @@ function CategoryPage() {
         </p>
       </div>
 
-      <div>
-        <h3 className="text-sm font-bold uppercase tracking-wide">Marque</h3>
-        <ul className="mt-3 space-y-2">
-          {availableBrands.map((b) => (
-            <li key={b} className="flex items-center gap-2">
-              <Checkbox id={`brand-${b}`} checked={brands.includes(b)} onCheckedChange={() => { toggleBrand(b); setPage(1); }} />
-              <Label htmlFor={`brand-${b}`} className="text-sm font-normal">{b}</Label>
-            </li>
-          ))}
-          {availableBrands.length === 0 && <li className="text-sm text-muted-foreground">—</li>}
-        </ul>
-      </div>
+      {availableBrands.length > 0 && (
+        <div>
+          <h3 className="text-sm font-bold uppercase tracking-wide">Marque</h3>
+          <ul className="mt-3 space-y-2">
+            {availableBrands.map((b) => (
+              <li key={b} className="flex items-center gap-2">
+                <Checkbox id={`brand-${b}`} checked={brands.includes(b)} onCheckedChange={() => { toggleBrand(b); setPage(1); }} />
+                <Label htmlFor={`brand-${b}`} className="text-sm font-normal">{b}</Label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div>
         <h3 className="text-sm font-bold uppercase tracking-wide">Disponibilité</h3>
@@ -169,7 +224,8 @@ function CategoryPage() {
         variant="outline"
         className="w-full"
         onClick={() => {
-          setPriceRange([0, maxPrice]); setBrands([]); setInStockOnly(false); setOnSaleOnly(false); setPage(1);
+          setPriceRange([0, maxPrice]); setBrands([]); setSubCategoryIds([]);
+          setInStockOnly(false); setOnSaleOnly(false); setPage(1);
         }}
       >
         Réinitialiser les filtres
@@ -224,21 +280,6 @@ function CategoryPage() {
             </Select>
           </div>
         </div>
-
-        {subCategories.length > 0 && (
-          <div className="mt-5 flex flex-wrap gap-2">
-            {subCategories.map((s) => (
-              <Link
-                key={s.id}
-                to="/categorie/$slug"
-                params={{ slug: s.slug }}
-                className="rounded-full border border-border bg-card px-4 py-1.5 text-sm hover:border-accent-strong hover:text-accent-strong"
-              >
-                {s.name}
-              </Link>
-            ))}
-          </div>
-        )}
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[240px_1fr]">
           <aside className="hidden lg:block">{filtersPanel}</aside>

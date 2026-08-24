@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ImagePlus, Package, Edit2, Plus, Trash2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { genId } from "@/lib/uid";
 import { RichText } from "@/components/ui/rich-text";
+import { takeAdminFocus } from "@/lib/admin-focus";
 import {
   Pagination,
   PaginationContent,
@@ -42,6 +43,12 @@ import {
 } from "@/components/ui/pagination";
 
 export const Route = createFileRoute("/admin/produits")({
+  // Liens profonds depuis les alertes de stock : `?produit=<uuid>`, ou
+  // `?nom=<nom>` pour les alertes antérieures dont le lien n'avait pas d'id.
+  validateSearch: (search: Record<string, unknown>): { produit?: string; nom?: string } => ({
+    ...(typeof search["produit"] === "string" ? { produit: search["produit"] } : {}),
+    ...(typeof search["nom"] === "string" ? { nom: search["nom"] } : {}),
+  }),
   component: AdminProducts,
 });
 
@@ -63,6 +70,13 @@ function AdminProducts() {
   const [priceSort, setPriceSort] = useState<"asc" | "desc" | null>(null);
   const [stockSort, setStockSort] = useState<"asc" | "desc" | null>(null);
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
+  const { produit: focusProductId, nom: focusProductName } = Route.useSearch();
+  // Cible transmise par la boîte de réception (cf. lib/admin-focus).
+  const [relayFocus, setRelayFocus] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    setRelayFocus(takeAdminFocus("/admin/produits"));
+  }, []);
+  const focusNavigate = useNavigate();
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Sélection de variante par ATTRIBUT (ex: { attrCouleurId: valRougeId, attrTailleId: valMId })
@@ -247,6 +261,23 @@ function AdminProducts() {
   };
 
   const refresh = async () => { await fetchProducts(); };
+
+  useEffect(() => {
+    const wantedId = focusProductId ?? relayFocus?.["produit"];
+    const wantedName = focusProductName ?? relayFocus?.["nom"];
+    if (!wantedId && !wantedName) return;
+    const target = list.find(
+      (p) =>
+        (wantedId && p.id === wantedId) ||
+        (wantedName && p.name.trim() === wantedName.trim()),
+    );
+    if (!target) return;
+    setViewProduct(target);
+    setRelayFocus(null);
+    setSelectedOptions({});
+    setSelectedImageId(null);
+    focusNavigate({ to: "/admin/produits", search: {}, replace: true });
+  }, [focusProductId, focusProductName, relayFocus, list, focusNavigate]);
 
   // Badge « Nouveau » : simple mise en avant en boutique, pas de confirmation.
   const toggleIsNew = async (id: string, next: boolean) => {

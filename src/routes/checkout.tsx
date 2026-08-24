@@ -6,7 +6,8 @@ import { StoreLayout } from "@/components/store/StoreLayout";
 import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
 import { GOVERNORATES } from "@/data/governorates";
-import { formatPrice } from "@/lib/placeholder";
+import { formatPrice, formatShipping } from "@/lib/placeholder";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { supabase } from "@/lib/supabaseClient";
 import type { Address } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -67,11 +68,12 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutPage() {
   const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
   const { user, profile, loading: authLoading, openAuth } = useAuth();
+  const { settings } = useSiteSettings();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
-  const [shippingRates, setShippingRates] = useState<Record<string, number>>({});
+
   const navigate = useNavigate();
   const idempotencyKey = useRef(randomUUID());
 
@@ -163,49 +165,17 @@ function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
 
-  useEffect(() => {
-    let mounted = true;
-    async function loadShippingRates() {
-      try {
-        const { data, error } = await supabase
-          .from("shipping_rates")
-          .select("governorate, price")
-          .eq("is_active", true);
-        if (error) throw error;
-        if (!mounted) return;
-        const map: Record<string, number> = {};
-        (data ?? []).forEach((rate: { governorate: string; price: number | string | null }) => {
-          if (rate.governorate) {
-            map[rate.governorate] = Number(rate.price ?? 0);
-          }
-        });
-        setShippingRates(map);
-      } catch (err) {
-        console.error("loadShippingRates", err);
-        toast.error("Impossible de charger les frais de livraison.");
-      }
-    }
+  // Tarif unique pour toute la Tunisie : tous les gouvernorats sont livrables,
+  // il n'y a plus de bareme a charger ni de destination a exclure.
+  const availableGovernorates = GOVERNORATES;
 
-    loadShippingRates();
-    return () => { mounted = false; };
-  }, []);
-
-  const availableGovernorates = useMemo(
-    () => GOVERNORATES.filter((g) => shippingRates[g] !== undefined && Number(shippingRates[g]) >= 0),
-    [shippingRates],
-  );
-
-  const shipping = items.length === 0 ? 0 : Number(shippingRates[governorate] ?? 0);
+  const shipping = items.length === 0 ? 0 : Number(settings?.shipping_price ?? 0);
   const total = Math.max(0, subtotal - (coupon?.discount ?? 0)) + shipping;
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!governorate) {
       toast.error("Veuillez choisir un gouvernorat.");
-      return;
-    }
-    if (!shippingRates[governorate]) {
-      toast.error("La livraison n'est pas disponible pour ce gouvernorat.");
       return;
     }
     if (!phone.trim() || !addressLine.trim() || !city.trim()) {
@@ -503,7 +473,9 @@ function CheckoutPage() {
                 )}
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Livraison</dt>
-                  <dd className="font-medium">{formatPrice(shipping)}</dd>
+                  <dd className={`font-medium ${shipping > 0 ? "" : "text-emerald-600"}`}>
+                    {formatShipping(shipping)}
+                  </dd>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-base">

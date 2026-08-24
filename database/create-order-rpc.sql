@@ -49,6 +49,7 @@ declare
   v_total numeric;
   v_order_id uuid;
   v_coupon record;
+  v_customer_email text;
 begin
   if v_user_id is null then
     raise exception 'Authentication required';
@@ -56,6 +57,20 @@ begin
 
   if p_items is null or jsonb_array_length(p_items) = 0 then
     raise exception 'Cart is empty';
+  end if;
+
+  -- L'e-mail n'est pas saisi au checkout (le client est deja connecte), donc
+  -- shipping_address n'en contient aucun et le back-office affichait un tiret.
+  -- On le fige ici, dans la commande :
+  --   * c'est un instantane -- l'admin doit voir le contact utilise pour CETTE
+  --     commande, pas l'e-mail actuel du profil ;
+  --   * ca evite de dependre d'une policy de lecture sur profiles cote admin.
+  if coalesce(p_shipping_address->>'email', '') = '' then
+    select email into v_customer_email from public.profiles where id = v_user_id;
+    if v_customer_email is not null then
+      p_shipping_address := coalesce(p_shipping_address, '{}'::jsonb)
+        || jsonb_build_object('email', v_customer_email);
+    end if;
   end if;
 
   if p_idempotency_key is not null then
@@ -66,11 +81,13 @@ begin
     end if;
   end if;
 
-  select price into v_shipping from public.shipping_rates
-    where governorate = p_governorate and is_active = true;
-  if v_shipping is null then
-    raise exception 'Shipping not available for this governorate';
-  end if;
+  -- Tarif unique pour toute la Tunisie (cf. database/shipping-flat-rate.sql).
+  -- Remplace l'ancien bareme par gouvernorat : la boutique livre partout au
+  -- meme prix, donc plus aucune raison de refuser une commande selon la
+  -- destination. 0 = livraison gratuite, ce n'est pas un tarif manquant : d'ou
+  -- le coalesce plutot qu'une exception.
+  select coalesce(shipping_price, 0) into v_shipping from public.site_settings limit 1;
+  v_shipping := coalesce(v_shipping, 0);
 
   insert into public.orders (
     user_id, status, subtotal, shipping_amount, discount_amount, total,
@@ -243,3 +260,14 @@ end;
 $$;
 
 grant execute on function public.validate_coupon(text, numeric) to authenticated;
+
+-- Rattrapage des commandes deja enregistrees, qui n'ont pas d'e-mail dans leur
+-- adresse de livraison. Idempotent : la clause where exclut celles deja
+-- completees, le script peut donc etre rejoue sans effet.
+update public.orders o
+set shipping_address = coalesce(o.shipping_address, '{}'::jsonb)
+  || jsonb_build_object('email', p.email)
+from public.profiles p
+where p.id = o.user_id
+  and p.email is not null
+  and coalesce(o.shipping_address->>'email', '') = '';

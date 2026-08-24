@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronDown, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
-import { buildCategoryTree } from "@/data/categories";
+import { categoryTreeWithProducts } from "@/data/categories";
 import { isOnSale } from "@/data/products";
 import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
@@ -17,23 +17,8 @@ export function MegaMenu() {
     let mounted = true;
     Promise.all([fetchCategories(), fetchActiveProducts()])
       .then(([categories, products]) => {
-        const categoriesById = new Map(categories.map((category) => [category.id, category]));
-        const visibleCategoryIds = new Set<string>();
-
-        products.forEach((product) => {
-          let categoryId = product.category_id;
-          while (categoryId) {
-            visibleCategoryIds.add(categoryId);
-            categoryId = categoriesById.get(categoryId)?.parent_id ?? null;
-          }
-        });
-
-        const filterTree = (nodes: CategoryNode[]): CategoryNode[] => nodes
-          .filter((node) => visibleCategoryIds.has(node.id))
-          .map((node) => ({ ...node, children: filterTree(node.children) }));
-
         if (!mounted) return;
-        setTree(filterTree(buildCategoryTree(categories)));
+        setTree(categoryTreeWithProducts(categories, products));
         setHasPromos(products.some(isOnSale));
       })
       .catch((err) => console.error("load mega menu categories", err));

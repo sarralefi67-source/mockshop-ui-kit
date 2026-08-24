@@ -31,3 +31,11 @@ function escapeXml(s: string) {
 export function formatPrice(value: number): string {
   return `${value.toFixed(3).replace(".", ",")} DT`;
 }
+
+/**
+ * Frais de livraison : un tarif a zero est une livraison offerte, pas un prix.
+ * Affiche "Gratuite" plutot que "0,000 DT" dans le panier et au checkout.
+ */
+export function formatShipping(value: number): string {
+  return value > 0 ? formatPrice(value) : "Gratuite";
+}

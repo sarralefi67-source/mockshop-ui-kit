@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Heart, Instagram, Menu, Phone, Search, ShoppingCart, User, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Facebook, Heart, Instagram, Menu, Phone, Search, ShoppingCart, User } from "lucide-react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useStore } from "@/context/StoreContext";
 import { useAuth } from "@/context/AuthContext";
-import { buildCategoryTree } from "@/data/categories";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { categoryTreeWithProducts } from "@/data/categories";
 import { fetchActiveProducts, fetchCategories } from "@/lib/catalog";
 import { formatPrice } from "@/lib/placeholder";
 import type { CategoryNode, Product } from "@/types";
@@ -12,13 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { MegaMenu } from "./MegaMenu";
-
-// URLs des réseaux sociaux — à remplacer par vos vrais liens
-const SOCIAL_LINKS = {
-  instagram: "https://instagram.com/votre_compte",
-  tiktok: "https://www.tiktok.com/@votre_compte",
-  whatsapp: "https://wa.me/21671000000",
-};
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
@@ -49,6 +43,7 @@ function Logo({ className }: { className?: string }) {
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
   const { user, profile, signOut, openAuth } = useAuth();
+  const { settings } = useSiteSettings();
   const [query, setQuery] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -57,16 +52,13 @@ export function Header() {
 
   useEffect(() => {
     let mounted = true;
-    fetchCategories()
-      .then((data) => {
-        if (mounted) setTree(buildCategoryTree(data));
+    Promise.all([fetchCategories(), fetchActiveProducts()])
+      .then(([categories, activeProducts]) => {
+        if (!mounted) return;
+        setProducts(activeProducts);
+        setTree(categoryTreeWithProducts(categories, activeProducts));
       })
-      .catch((err) => console.error("load header categories", err));
-    fetchActiveProducts()
-      .then((data) => {
-        if (mounted) setProducts(data);
-      })
-      .catch((err) => console.error("load header search products", err));
+      .catch((err) => console.error("load header catalog", err));
     return () => {
       mounted = false;
     };
@@ -80,43 +72,47 @@ export function Header() {
       .slice(0, 6);
   }, [products, query]);
 
+  // Seuls les reseaux renseignes dans /admin/parametres sont affiches.
+  const socialLinks = useMemo(() => {
+    const all: {
+      key: string;
+      href: string | null | undefined;
+      label: string;
+      Icon: ComponentType<{ className?: string }>;
+    }[] = [
+      { key: "instagram", href: settings?.instagram_url, label: "Instagram", Icon: Instagram },
+      { key: "facebook", href: settings?.facebook_url, label: "Facebook", Icon: Facebook },
+      { key: "tiktok", href: settings?.tiktok_url, label: "TikTok", Icon: TikTokIcon },
+      { key: "whatsapp", href: settings?.whatsapp_url, label: "WhatsApp", Icon: WhatsAppIcon },
+    ];
+    // flatMap plutot que filter : il retire les liens vides ET restreint le
+    // type de `href` a string, ce qu'un filter ne fait pas.
+    return all.flatMap((link) => (link.href?.trim() ? [{ ...link, href: link.href.trim() }] : []));
+  }, [settings]);
+
   return (
     <header className="sticky top-0 z-50 bg-card">
       <div className="weave-texture border-b border-border/60 bg-surface text-foreground">
         <div className="container-page relative flex h-10 items-center justify-center gap-2 text-[13px]">
           <p className="flex items-center gap-2">
-            <Phone className="h-3.5 w-3.5 text-accent-strong" /> +216 71 000 000 — Livraison 24/48h
+            <Phone className="h-3.5 w-3.5 text-accent-strong" />
+            {settings?.phone ? `${settings.phone} — Livraison 24/48h` : "Livraison 24/48h"}
           </p>
           <p className="hidden font-medium sm:block">— Paiement à la livraison partout en Tunisie</p>
 
           <div className="absolute right-4 hidden items-center gap-3 sm:flex">
-            <a
-              href={SOCIAL_LINKS.instagram}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Instagram"
-              className="text-muted-foreground transition-colors hover:text-accent-strong"
-            >
-              <Instagram className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href={SOCIAL_LINKS.tiktok}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="TikTok"
-              className="text-muted-foreground transition-colors hover:text-accent-strong"
-            >
-              <TikTokIcon className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href={SOCIAL_LINKS.whatsapp}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="WhatsApp"
-              className="text-muted-foreground transition-colors hover:text-accent-strong"
-            >
-              <WhatsAppIcon className="h-3.5 w-3.5" />
-            </a>
+            {socialLinks.map(({ key, href, label, Icon }) => (
+              <a
+                key={key}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={label}
+                className="text-muted-foreground transition-colors hover:text-accent-strong"
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </a>
+            ))}
           </div>
         </div>
       </div>
@@ -271,11 +267,8 @@ export function Header() {
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-80 p-0">
-          <SheetHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
+          <SheetHeader className="border-b border-border px-5 py-4">
             <SheetTitle>Catégories</SheetTitle>
-            <button onClick={() => setMobileOpen(false)} aria-label="Fermer">
-              <X className="h-5 w-5" />
-            </button>
           </SheetHeader>
           <div className="overflow-y-auto px-3 py-2">
             <Accordion type="multiple">

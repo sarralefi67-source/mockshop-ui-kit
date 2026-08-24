@@ -44,7 +44,10 @@ declare
     -- trigger assumes. They're link tables anyway (low audit value).
     'products', 'product_variants', 'product_images', 'variant_images',
     'attributes', 'attribute_values',
-    'categories', 'promotions', 'coupons', 'shipping_rates',
+    -- shipping_rates a ete supprimee (tarif unique, cf.
+    -- database/shipping-flat-rate.sql) : la laisser ici ferait echouer le
+    -- rejeu de ce fichier. Le tarif est desormais audite via site_settings.
+    'categories', 'promotions', 'coupons', 'site_settings',
     'orders', 'order_items', 'reviews', 'newsletter_subscribers'
   ];
 begin

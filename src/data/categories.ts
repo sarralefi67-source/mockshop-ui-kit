@@ -55,6 +55,38 @@ export function buildCategoryTree(list: Category[] = categories): CategoryNode[]
   return roots;
 }
 
+/**
+ * Arborescence réduite aux catégories qui portent au moins un produit, soit
+ * directement soit via une descendante — à n'importe quelle profondeur. Une
+ * branche entièrement vide disparaît, y compris ses niveaux intermédiaires.
+ */
+export function categoryTreeWithProducts(
+  list: Category[],
+  products: { category_id: string | null }[],
+): CategoryNode[] {
+  const byId = new Map(list.map((category) => [category.id, category]));
+  const visible = new Set<string>();
+
+  products.forEach((product) => {
+    let categoryId = product.category_id;
+    // Garde-fou : une donnée cyclique (parent_id auto-référencé) ferait
+    // tourner la remontée indéfiniment.
+    const walked = new Set<string>();
+    while (categoryId && !walked.has(categoryId)) {
+      walked.add(categoryId);
+      visible.add(categoryId);
+      categoryId = byId.get(categoryId)?.parent_id ?? null;
+    }
+  });
+
+  const prune = (nodes: CategoryNode[]): CategoryNode[] =>
+    nodes
+      .filter((node) => visible.has(node.id))
+      .map((node) => ({ ...node, children: prune(node.children) }));
+
+  return prune(buildCategoryTree(list));
+}
+
 export function findCategoryBySlug(slug: string, list: Category[] = categories) {
   return list.find((c) => c.slug === slug);
 }

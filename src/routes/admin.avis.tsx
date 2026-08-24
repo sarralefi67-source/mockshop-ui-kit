@@ -14,7 +14,7 @@ alter table public.reviews
   alter column is_approved set default null;
 */
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { CheckCircle2, Clock3, Eye, Trash2, XCircle } from "lucide-react";
 import SortArrow from "@/components/ui/sort-arrow";
 import Spinner from "@/components/ui/spinner";
+import { takeAdminFocus } from "@/lib/admin-focus";
 import {
   Pagination,
   PaginationContent,
@@ -38,6 +39,10 @@ import {
 } from "@/components/ui/pagination";
 
 export const Route = createFileRoute("/admin/avis")({
+  // `?review=<uuid>` : lien profond depuis les notifications, qui ouvre
+  // directement le détail de l'avis concerné.
+  validateSearch: (search: Record<string, unknown>): { review?: string } =>
+    typeof search["review"] === "string" ? { review: search["review"] } : {},
   component: AdminAvis,
 });
 
@@ -65,6 +70,13 @@ function AdminAvis() {
   const [updatingStatusAction, setUpdatingStatusAction] = useState<"approve" | "reject" | null>(null);
   const [statusDecision, setStatusDecision] = useState<{ id: string; status: boolean | null | undefined } | null>(null);
   const [reviewDetails, setReviewDetails] = useState<ReviewRow | null>(null);
+  const { review: focusReviewId } = Route.useSearch();
+  // Cible transmise par la boîte de réception (cf. lib/admin-focus).
+  const [relayFocus, setRelayFocus] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    setRelayFocus(takeAdminFocus("/admin/avis"));
+  }, []);
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -109,6 +121,19 @@ function AdminAvis() {
     load();
     return () => { mounted = false; };
   }, []);
+
+  // Une fois les avis chargés, on ouvre celui visé par la notification puis on
+  // retire le paramètre : refermer le détail ne doit pas le rouvrir au
+  // rafraîchissement de la page.
+  useEffect(() => {
+    const wantedId = focusReviewId ?? relayFocus?.["review"];
+    if (!wantedId) return;
+    const target = reviews.find((r) => r.id === wantedId);
+    if (!target) return;
+    setReviewDetails(target);
+    setRelayFocus(null);
+    navigate({ to: "/admin/avis", search: {}, replace: true });
+  }, [focusReviewId, relayFocus, reviews, navigate]);
 
   const visible = useMemo(() => {
     const q = String(query ?? "").trim().toLowerCase();

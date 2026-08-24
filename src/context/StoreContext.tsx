@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CartItem } from "@/types";
-import { SHIPPING_FEE } from "@/data/coupons";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -33,6 +33,8 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
+  const { settings } = useSiteSettings();
+  const shippingPrice = settings?.shipping_price ?? 0;
   const [items, setItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -101,7 +103,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [items],
   );
   const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items]);
-  const shipping = items.length === 0 ? 0 : SHIPPING_FEE;
+  // Tarif unique defini dans /admin/parametres (site_settings.shipping_price)
+  // au lieu de la constante SHIPPING_FEE : le prix doit suivre la boutique.
+  const shipping = items.length === 0 ? 0 : shippingPrice;
   const discount = coupon?.discount ?? 0;
   const total = Math.max(0, subtotal - discount) + shipping;
 

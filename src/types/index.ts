@@ -873,24 +873,45 @@ export type Database = {
           },
         ]
       }
-      shipping_rates: {
+      site_settings: {
         Row: {
-          governorate: string
+          address: string | null
+          email: string | null
+          facebook_url: string | null
           id: string
-          is_active: boolean | null
-          price: number
+          instagram_url: string | null
+          phone: string | null
+          tiktok_url: string | null
+          updated_at: string
+          whatsapp_url: string | null
+          favicon_url: string | null
+          shipping_price: number
         }
         Insert: {
-          governorate: string
+          address?: string | null
+          email?: string | null
+          facebook_url?: string | null
           id?: string
-          is_active?: boolean | null
-          price?: number
+          instagram_url?: string | null
+          phone?: string | null
+          tiktok_url?: string | null
+          updated_at?: string
+          whatsapp_url?: string | null
+          favicon_url?: string | null
+          shipping_price?: number
         }
         Update: {
-          governorate?: string
+          address?: string | null
+          email?: string | null
+          facebook_url?: string | null
           id?: string
-          is_active?: boolean | null
-          price?: number
+          instagram_url?: string | null
+          phone?: string | null
+          tiktok_url?: string | null
+          updated_at?: string
+          whatsapp_url?: string | null
+          favicon_url?: string | null
+          shipping_price?: number
         }
         Relationships: []
       }
@@ -1128,6 +1149,7 @@ export type Order = {
   customer_phone: string
   address_line?: string
   city?: string
+  postal_code?: string
   status: OrderStatus
   payment_method?: string
   subtotal: number

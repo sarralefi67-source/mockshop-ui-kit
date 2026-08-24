@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Download, Eye, Plus, Trash2, Edit2, SlidersHorizontal, User, Phone, Mail, MapPin, FileText, Divide } from "lucide-react";
+import { GOVERNORATES } from "@/data/governorates";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import SortArrow from "@/components/ui/sort-arrow";
 import { toast } from "sonner";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from "@/data/orders";
@@ -26,8 +28,15 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationLink, PaginationItem, PaginationPrevious, PaginationNext, PaginationEllipsis } from "@/components/ui/pagination";
+import { takeAdminFocus } from "@/lib/admin-focus";
 
 export const Route = createFileRoute("/admin/commandes")({
+  // Liens profonds depuis les notifications : `?order=<uuid>`, ou `?ref=<numéro>`
+  // pour les notifications antérieures dont le lien ne portait pas d'identifiant.
+  validateSearch: (search: Record<string, unknown>): { order?: string; ref?: string } => ({
+    ...(typeof search["order"] === "string" ? { order: search["order"] } : {}),
+    ...(typeof search["ref"] === "string" ? { ref: search["ref"] } : {}),
+  }),
   component: AdminOrders,
 });
 
@@ -140,7 +149,30 @@ async function fetchOrders(): Promise<Order[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map(mapOrderRow);
+  const rows = data ?? [];
+  const orders = rows.map(mapOrderRow);
+
+  // Le checkout boutique ne met pas d'e-mail dans shipping_address (il n'est
+  // saisi nulle part côté client) : on le complète depuis profiles. En
+  // best-effort — un échec ici ne doit pas priver l'admin de sa liste.
+  const userIds = [...new Set(rows.map((r: any) => r.user_id).filter(Boolean))];
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .in("id", userIds);
+    if (profilesError) {
+      console.warn("load order customer emails", profilesError);
+    } else {
+      const emailByUser = new Map((profiles ?? []).map((p: any) => [p.id, p.email]));
+      rows.forEach((r: any, index: number) => {
+        const order = orders[index];
+        if (order && !order.customer_email) order.customer_email = emailByUser.get(r.user_id) ?? "";
+      });
+    }
+  }
+
+  return orders;
 }
 
 function mapOrderRow(r: any): Order {
@@ -152,8 +184,9 @@ function mapOrderRow(r: any): Order {
     customer_name: shipping.full_name || shipping.name || "Client",
     customer_email: shipping.email || "",
     customer_phone: shipping.phone || shipping.mobile || "",
-    address_line: shipping.address_line || "",
+    address_line: shipping.line1 || shipping.address_line || "",
     city: shipping.city || "",
+    postal_code: shipping.postal_code || "",
     governorate: shipping.governorate || shipping.city || "",
     status: (r.status as OrderStatus) || "pending",
     payment_method: r.payment_method || "",
@@ -186,13 +219,21 @@ function mapOrderRow(r: any): Order {
 
 function AdminOrders() {
   const { profile } = useAuth();
+  const { settings } = useSiteSettings();
   const [list, setList] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [detail, setDetail] = useState<Order | null>(null);
+  const { order: focusOrderId, ref: focusOrderRef } = Route.useSearch();
+  // Cible transmise par la boîte de réception (cf. lib/admin-focus).
+  const [relayFocus, setRelayFocus] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    setRelayFocus(takeAdminFocus("/admin/commandes"));
+  }, []);
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
-  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([]);
+
   const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
   const [selectedOrderItems, setSelectedOrderItems] = useState<DraftOrderItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
@@ -336,35 +377,21 @@ function AdminOrders() {
     return () => { mounted = false; };
   }, []);
 
+
   useEffect(() => {
-    let mounted = true;
-    async function loadShippingRates() {
-      const { data, error } = await supabase
-        .from("shipping_rates")
-        .select("*")
-        .eq("is_active", true)
-        .order("governorate", { ascending: true });
-
-      if (error) {
-        console.error(error);
-        toast.error("Impossible de charger les tarifs de livraison.");
-        return;
-      }
-      if (!mounted) return;
-
-      setShippingRates(
-        (data ?? []).map((r: any) => ({
-          id: r.id,
-          governorate: r.governorate,
-          price: Number(r.price ?? 0),
-          is_active: r.is_active ?? true,
-        })),
-      );
-    }
-
-    loadShippingRates();
-    return () => { mounted = false; };
-  }, []);
+    const wantedId = focusOrderId ?? relayFocus?.["order"];
+    const wantedRef = focusOrderRef ?? relayFocus?.["ref"];
+    if (!wantedId && !wantedRef) return;
+    const target = list.find(
+      (o) => (wantedId && o.id === wantedId) || (wantedRef && o.reference === wantedRef),
+    );
+    if (!target) return;
+    setDetail(target);
+    setRelayFocus(null);
+    // On retire le paramètre : refermer la fiche ne doit pas la rouvrir au
+    // rafraîchissement de la page.
+    navigate({ to: "/admin/commandes", search: {}, replace: true });
+  }, [focusOrderId, focusOrderRef, relayFocus, list, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -613,6 +640,21 @@ function AdminOrders() {
     );
   });
   const displayedProductValue = selectedProduct ? selectedProduct.name : productSearch;
+
+  // Tarif unique pour toute la Tunisie (cf. database/shipping-flat-rate.sql) :
+  // la table shipping_rates n'existe plus. On reconstitue la meme forme de
+  // donnees a partir de la liste des gouvernorats et du tarif de la boutique,
+  // ce qui laisse le selecteur et sa recherche fonctionner a l'identique.
+  const shippingRates = useMemo<ShippingRate[]>(
+    () =>
+      GOVERNORATES.map((g) => ({
+        id: g,
+        governorate: g,
+        price: Number(settings?.shipping_price ?? 0),
+        is_active: true,
+      })),
+    [settings],
+  );
 
   const selectedShippingRate = shippingRates.find(
     (r) => r.governorate.toLowerCase() === draft.governorate.trim().toLowerCase(),
@@ -1578,7 +1620,13 @@ function AdminOrders() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground">{[detail.address_line, detail.city, detail.governorate].filter(Boolean).join(", ") || "—"}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {[
+                                    detail.address_line,
+                                    [detail.postal_code, detail.city].filter(Boolean).join(" "),
+                                    detail.governorate,
+                                  ].filter(Boolean).join(", ") || "—"}
+                                </p>
                               </div>
                               {detail.notes ? (
                                 <div className="mt-2 flex items-start gap-2">

@@ -24,9 +24,12 @@ export const Route = createFileRoute("/admin")({
   component: AdminLayout,
 });
 
+// Aligné sur le seuil des alertes SQL (database/notifications-low-stock.sql).
+const LOW_STOCK_THRESHOLD = 5;
+
 const nav = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/notifications", label: "Notifications", icon: Bell, exact: false },
+  // { to: "/admin/notifications", label: "Notifications", icon: Bell, exact: false },
   { to: "/admin/banners", label: "Bannières", icon: Image, exact: false },
   { to: "/admin/produits", label: "Produits", icon: Package, exact: false },
   { to: "/admin/commandes", label: "Commandes", icon: ShoppingBag, exact: false },
@@ -49,6 +52,10 @@ function AdminLayout() {
 
   const isAdmin = Boolean(user && profile && profile.role === "admin");
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  // Pastilles « à traiter » du menu, par route. Le stock faible est le seul
+  // seuil arbitraire : il est aligné sur celui des alertes SQL
+  // (database/notifications-low-stock.sql).
+  const [navBadges, setNavBadges] = useState<Record<string, number>>({});
 
   const loadUnreadNotifications = async () => {
     const { count, error } = await supabase
@@ -62,19 +69,64 @@ function AdminLayout() {
     setUnreadNotifications(count ?? 0);
   };
 
+  const loadNavBadges = async () => {
+    const countOf = async (build: () => any, label: string) => {
+      const { count, error } = await build();
+      if (error) {
+        console.warn(`load badge ${label}`, error);
+        return 0;
+      }
+      return count ?? 0;
+    };
+
+    const [orders, reviews, lowStock] = await Promise.all([
+      countOf(
+        () => supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        "commandes",
+      ),
+      countOf(
+        () => supabase.from("reviews").select("id", { count: "exact", head: true }).is("is_approved", null),
+        "avis",
+      ),
+      countOf(
+        () =>
+          supabase
+            .from("products")
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true)
+            .lte("stock_quantity", LOW_STOCK_THRESHOLD),
+        "stock",
+      ),
+    ]);
+
+    setNavBadges({
+      "/admin/commandes": orders,
+      "/admin/avis": reviews,
+      // "/admin/produits": lowStock,
+    });
+  };
+
   // Initial unread count + live updates while an admin is in the panel
   // (notifications is in the supabase_realtime publication and RLS-gated to
   // is_admin(), see database/notifications.sql).
   useEffect(() => {
     if (!isAdmin) return;
     loadUnreadNotifications();
+    loadNavBadges();
 
     const channel = supabase
       .channel("admin-notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload) => {
-        const row = payload.new as { title?: string };
-        toast.info(row.title ?? "Nouvelle notification");
+        const row = payload.new as { title?: string; body?: string | null };
+        // Carte en bas à droite, sans action : elle informe sans réclamer de
+        // clic. `position` est passée par toast plutôt que sur le <Toaster>
+        // global, pour ne pas déplacer tous les autres messages du site.
+        toast.info(row.title ?? "Nouvelle notification", {
+          position: "bottom-right",
+          ...(row.body ? { description: row.body } : {}),
+        });
         loadUnreadNotifications();
+        loadNavBadges();
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "notifications" }, () => {
         loadUnreadNotifications();
@@ -87,6 +139,7 @@ function AdminLayout() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   useEffect(() => {
@@ -166,9 +219,9 @@ function AdminLayout() {
               >
                 <Icon className="h-4 w-4" />
                 {label}
-                {to === "/admin/notifications" && unreadNotifications > 0 && (
+                {(navBadges[to] ?? 0) > 0 && (
                   <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-accent-strong px-1 text-[11px] font-bold text-accent-strong-foreground">
-                    {unreadNotifications}
+                    {navBadges[to]}
                   </span>
                 )}
               </Link>

@@ -1,7 +1,22 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { StoreLayout } from "@/components/store/StoreLayout";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 
-const pages: Record<string, { title: string; intro: string; sections: { heading: string; body: string }[] }> = {
+type PageSection = {
+  heading: string;
+  body?: string;
+  /** Liste à puces affichée sous le paragraphe. */
+  items?: string[];
+  /** Paragraphe de précision affiché après la liste. */
+  note?: string;
+};
+
+/**
+ * Dans `body`, le jeton `{email}` est remplacé par l'adresse de contact de la
+ * boutique (/admin/parametres), pour qu'une page légale ne fige pas un e-mail
+ * qui peut changer.
+ */
+const pages: Record<string, { title: string; intro: string; sections: PageSection[] }> = {
   cgv: {
     title: "Conditions générales de vente",
     intro: "Les présentes conditions régissent les ventes réalisées sur le site (contenu de démonstration).",
@@ -41,6 +56,68 @@ const pages: Record<string, { title: string; intro: string; sections: { heading:
   },
 };
 
+pages["confidentialite"] = {
+  title: "Politique de confidentialité",
+  intro:
+    "Dernière mise à jour : avril 2026. La protection de vos données personnelles est une priorité pour Artisanat. Nous nous engageons à traiter vos informations avec la plus grande confidentialité et transparence.",
+  sections: [
+    {
+      heading: "Données collectées",
+      body: "Lors de votre navigation et de vos achats sur notre site, nous sommes amenés à collecter les informations suivantes :",
+      items: [
+        "Nom, prénom et coordonnées (e-mail, téléphone, adresse de livraison)",
+        "Données de paiement (traitées de manière sécurisée, non stockées)",
+        "Historique de commandes et préférences produits",
+        "Données de navigation (cookies, pages visitées)",
+      ],
+    },
+    {
+      heading: "Utilisation des données",
+      body: "Vos données sont utilisées exclusivement pour :",
+      items: [
+        "Traiter et suivre vos commandes",
+        "Vous envoyer des informations relatives à votre compte",
+        "Améliorer votre expérience sur notre site",
+        "Vous adresser des offres personnalisées, avec votre accord préalable",
+      ],
+    },
+    {
+      heading: "Partage des données",
+      body: "Nous ne vendons ni ne partageons vos données personnelles avec des tiers à des fins commerciales.",
+    },
+    {
+      heading: "Cookies",
+      body: "Notre site utilise des cookies pour améliorer la navigation et analyser notre audience. Vous pouvez les désactiver via les paramètres de votre navigateur ; certaines fonctionnalités pourraient alors être limitées.",
+    },
+    {
+      heading: "Vos droits",
+      body: "Conformément à la législation en vigueur, vous disposez d'un droit d'accès, de rectification et de suppression de vos données. Pour exercer ces droits, contactez-nous à : {email}",
+    },
+  ],
+};
+
+pages["remboursement"] = {
+  title: "Politique de remboursement",
+  intro:
+    "Dernière mise à jour : avril 2026. Votre satisfaction est notre priorité. Nous acceptons les retours sous certaines conditions afin de vous garantir une expérience d'achat en toute confiance.",
+  sections: [
+    {
+      heading: "Conditions de retour",
+      body: "Un retour peut être effectué dans un délai de 14 jours suivant la réception de votre commande, sous réserve du respect des conditions suivantes :",
+      items: [
+        "Le produit doit être non ouvert et dans son emballage d'origine intact",
+        "Le produit ne doit présenter aucun signe de détérioration ou d'endommagement",
+        "Le bon de commande ou la preuve d'achat doit être joint au retour",
+      ],
+      note: "Pour des raisons d'hygiène, les produits de soin et les parfums ouverts ou utilisés ne peuvent pas être repris ni remboursés, conformément à la réglementation en vigueur.",
+    },
+    {
+      heading: "Frais de retour",
+      body: "Les frais de retour sont à la charge du client, sauf en cas d'erreur de notre part (produit incorrect ou défectueux). Dans ce cas, Artisanat prend en charge l'intégralité des frais de renvoi.",
+    },
+  ],
+};
+
 export const Route = createFileRoute("/pages/$slug")({
   loader: ({ params }) => {
     const page = pages[params.slug];
@@ -67,6 +144,8 @@ export const Route = createFileRoute("/pages/$slug")({
 function StaticPage() {
   const { slug } = Route.useParams();
   const page = pages[slug]!;
+  const { settings } = useSiteSettings();
+  const contactEmail = settings?.email?.trim() || "contact@artisanat.tn";
 
   return (
     <StoreLayout>
@@ -77,7 +156,23 @@ function StaticPage() {
           {page.sections.map((s) => (
             <section key={s.heading}>
               <h2 className="text-lg font-bold">{s.heading}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+              {s.body && (
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {s.body.replace("{email}", contactEmail)}
+                </p>
+              )}
+              {s.items && (
+                <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
+                  {s.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+              {s.note && (
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {s.note.replace("{email}", contactEmail)}
+                </p>
+              )}
             </section>
           ))}
         </div>

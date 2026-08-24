@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { StoreLayout } from "@/components/store/StoreLayout";
+import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/contact")({
 
 function ContactPage() {
   const [sending, setSending] = useState(false);
+  const { settings } = useSiteSettings();
 
   return (
     <StoreLayout>
@@ -32,9 +34,15 @@ function ContactPage() {
             Notre service client est disponible du lundi au samedi, de 9h à 18h.
           </p>
           <ul className="mt-6 space-y-3 text-sm">
-            <li className="flex items-center gap-3"><Phone className="h-4 w-4 text-accent-strong" /> +216 71 000 000</li>
-            <li className="flex items-center gap-3"><Mail className="h-4 w-4 text-accent-strong" /> contact@Artisanat.tn</li>
-            <li className="flex items-center gap-3"><MapPin className="h-4 w-4 text-accent-strong" /> Avenue Habib Bourguiba, Tunis</li>
+            {settings?.phone && (
+              <li className="flex items-center gap-3"><Phone className="h-4 w-4 text-accent-strong" /> {settings.phone}</li>
+            )}
+            {settings?.email && (
+              <li className="flex items-center gap-3"><Mail className="h-4 w-4 text-accent-strong" /> {settings.email}</li>
+            )}
+            {settings?.address && (
+              <li className="flex items-center gap-3"><MapPin className="h-4 w-4 text-accent-strong" /> {settings.address}</li>
+            )}
           </ul>
         </div>
 

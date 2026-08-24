@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Minus, Plus, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
-import { formatPrice } from "@/lib/placeholder";
+import { formatPrice, formatShipping } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
@@ -109,7 +109,9 @@ export function CartDrawer() {
                 )}
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Livraison</dt>
-                  <dd className="font-medium">{formatPrice(shipping)}</dd>
+                  <dd className={`font-medium ${shipping > 0 ? "" : "text-emerald-600"}`}>
+                    {formatShipping(shipping)}
+                  </dd>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-base">
