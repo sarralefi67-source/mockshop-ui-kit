@@ -12,12 +12,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowLeft, ArrowRight, Check, Eye, EyeOff, ImagePlus, Truck, X,
+  ArrowLeft, ArrowRight, Check, Eye, EyeOff, Truck, X,
 } from "lucide-react";
 import { formatPrice } from "@/lib/placeholder";
 import { useAuth } from "@/context/AuthContext";
 import { useSiteSettings, SITE_SETTINGS_ID, type SiteSettings } from "@/context/SiteSettingsContext";
-import { uploadToBucket } from "@/lib/storage";
 
 export const Route = createFileRoute("/admin/parametres")({
   component: AdminParametres,
@@ -38,7 +37,6 @@ const EMPTY_SETTINGS: SettingsForm = {
   facebook_url: "",
   tiktok_url: "",
   whatsapp_url: "",
-  favicon_url: "",
   shipping_price: "0",
 };
 
@@ -141,7 +139,6 @@ function AdminParametres() {
   // --- Coordonnees & reseaux sociaux --------------------------------------
   const [form, setForm] = useState<SettingsForm>(EMPTY_SETTINGS);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [uploadingFavicon, setUploadingFavicon] = useState(false);
 
 
   // --- Mot de passe (assistant en 2 etapes) -------------------------------
@@ -163,30 +160,12 @@ function AdminParametres() {
       facebook_url: settings.facebook_url ?? "",
       tiktok_url: settings.tiktok_url ?? "",
       whatsapp_url: settings.whatsapp_url ?? "",
-      favicon_url: settings.favicon_url ?? "",
       shipping_price: String(settings.shipping_price ?? 0),
     });
   }, [settings]);
 
   const setField = (key: keyof SettingsForm, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
-
-  const handleFaviconUpload = async (file: File) => {
-    setUploadingFavicon(true);
-    try {
-      const safeName = file.name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
-      // Horodaté : le navigateur met les favicons en cache très agressivement,
-      // un nom fixe garderait l'ancienne icône affichée après remplacement.
-      const publicUrl = await uploadToBucket("site", `favicon-${Date.now()}-${safeName}`, file);
-      setField("favicon_url", publicUrl);
-      toast.success("Icône chargée. Enregistrez pour l'appliquer.");
-    } catch (err) {
-      console.error("upload favicon", err);
-      toast.error("Échec de l'envoi de l'icône.");
-    } finally {
-      setUploadingFavicon(false);
-    }
-  };
 
   const settingsDirty = useMemo(() => {
     // Compare a EMPTY_SETTINGS quand la ligne n'a pas pu etre lue, sinon le
@@ -228,7 +207,6 @@ function AdminParametres() {
         facebook_url: clean(urls.facebook_url),
         tiktok_url: clean(urls.tiktok_url),
         whatsapp_url: clean(urls.whatsapp_url),
-        favicon_url: clean(form.favicon_url),
         shipping_price: Number(form.shipping_price),
       };
 
@@ -384,56 +362,6 @@ function AdminParametres() {
             </div>
 
             <Separator />
-
-            <div>
-              <h3 className="text-base font-semibold">Icône du site</h3>
-              <p className="text-sm text-muted-foreground">
-                Affichée dans l'onglet du navigateur et les favoris. Une image carrée donne le
-                meilleur rendu ; PNG, SVG ou ICO. Laissez vide pour garder l'icône par défaut.
-              </p>
-              <div className="mt-4 flex flex-wrap items-center gap-4">
-                {form.favicon_url ? (
-                  <img
-                    src={form.favicon_url}
-                    alt="Icône du site"
-                    className="h-16 w-16 rounded-md border border-border bg-surface object-contain p-1"
-                  />
-                ) : (
-                  <div className="grid h-16 w-16 place-items-center rounded-md border-2 border-dashed border-border text-muted-foreground">
-                    <ImagePlus className="h-6 w-6" />
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <label className="cursor-pointer text-sm font-semibold text-accent-strong hover:underline">
-                    {uploadingFavicon
-                      ? "Envoi…"
-                      : form.favicon_url
-                        ? "Changer l'icône"
-                        : "Choisir une image"}
-                    <input
-                      type="file"
-                      accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,image/jpeg,image/webp"
-                      className="hidden"
-                      disabled={uploadingFavicon}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFaviconUpload(file);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  {form.favicon_url && (
-                    <button
-                      type="button"
-                      className="text-sm text-muted-foreground hover:text-destructive"
-                      onClick={() => setField("favicon_url", "")}
-                    >
-                      Retirer
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
 
             <Separator />
 

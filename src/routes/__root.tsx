@@ -15,7 +15,6 @@ import { StoreProvider } from "@/context/StoreContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { SiteSettingsProvider } from "@/context/SiteSettingsContext";
 import { Toaster } from "@/components/ui/sonner";
-import { SiteFavicon } from "@/components/SiteFavicon";
 
 function NotFoundComponent() {
   return (
@@ -155,7 +154,6 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SiteSettingsProvider>
-        <SiteFavicon />
         <StoreProvider>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />

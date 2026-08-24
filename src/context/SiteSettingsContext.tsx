@@ -19,8 +19,6 @@ export type SiteSettings = {
   facebook_url: string | null;
   tiktok_url: string | null;
   whatsapp_url: string | null;
-  /** Icône affichée dans l'onglet du navigateur (cf. database/site-settings-favicon.sql). */
-  favicon_url: string | null;
   /**
    * Tarif de livraison unique pour toute la Tunisie, en DT
    * (cf. database/shipping-flat-rate.sql). 0 = livraison gratuite.
@@ -37,7 +35,7 @@ type SiteSettingsContextValue = {
 const SiteSettingsContext = createContext<SiteSettingsContextValue | null>(null);
 
 const COLUMNS =
-  "id, phone, email, address, instagram_url, facebook_url, tiktok_url, whatsapp_url, favicon_url, shipping_price";
+  "id, phone, email, address, instagram_url, facebook_url, tiktok_url, whatsapp_url, shipping_price";
 
 /**
  * Id fige de la ligne unique (cf. le CHECK dans database/site-settings.sql).

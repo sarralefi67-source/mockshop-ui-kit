@@ -36,7 +36,7 @@ const nav = [
   { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
   { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
   { to: "/admin/clients", label: "Clients", icon: User, exact: false },
-  { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
+  // { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
   { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
   { to: "/admin/parametres", label: "Paramètres", icon: User, exact: false },
 ] as const;
@@ -123,6 +123,7 @@ function AdminLayout() {
         // global, pour ne pas déplacer tous les autres messages du site.
         toast.info(row.title ?? "Nouvelle notification", {
           position: "bottom-right",
+          icon: <img src="/favicon.ico" alt="" className="h-5 w-5 rounded-sm object-contain" />,
           ...(row.body ? { description: row.body } : {}),
         });
         loadUnreadNotifications();

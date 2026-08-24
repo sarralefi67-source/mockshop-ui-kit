@@ -1,11 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { Mail, MapPin, Phone, Truck, ShieldCheck, RotateCcw } from "lucide-react";
+import { Facebook, Instagram, Mail, MapPin, Phone, Truck, ShieldCheck, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M16.5 3c.4 2.2 2 3.9 4.2 4.2v2.9c-1.5 0-2.9-.4-4.2-1.2v6.7a5.9 5.9 0 1 1-5.1-5.8v2.9a3 3 0 1 0 2.2 2.9V3h2.9Z" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1-.2.2-.6.8-.8 1-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5.1-.1.2-.3.4-.4.1-.1.2-.2.2-.4.1-.1 0-.3 0-.4-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9 0 1.1.8 2.2.9 2.4.1.2 1.6 2.5 3.9 3.5.5.2 1 .4 1.3.5.5.2 1 .1 1.4.1.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2-.1-.1-.2-.2-.4-.3Z" />
+    </svg>
+  );
+}
 
 export function Footer() {
   const [email, setEmail] = useState("");
@@ -80,6 +96,31 @@ export function Footer() {
         </div>
 
         <div>
+          <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Suivez-nous</h3>
+          <div className="mt-4 flex items-center gap-3">
+            {[
+              { href: settings?.instagram_url, label: "Instagram", Icon: Instagram },
+              { href: settings?.facebook_url, label: "Facebook", Icon: Facebook },
+              { href: settings?.tiktok_url, label: "TikTok", Icon: TikTokIcon },
+              { href: settings?.whatsapp_url, label: "WhatsApp", Icon: WhatsAppIcon },
+            ].map(({ href, label, Icon }) =>
+              href?.trim() ? (
+                <a
+                  key={label}
+                  href={href.trim()}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={label}
+                  className="grid h-10 w-10 place-items-center rounded-full bg-deep-foreground/10 text-deep-foreground/70 transition-colors hover:bg-ocre hover:text-deep"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ) : null,
+            )}
+          </div>
+        </div>
+
+        {/* <div>
           <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Newsletter</h3>
           <p className="mt-4 text-sm text-deep-foreground/70">
             Recevez les promos et nouveautés une fois par semaine.
@@ -122,7 +163,7 @@ export function Footer() {
               OK
             </Button>
           </form>
-        </div>
+        </div> */}
       </div>
 
       <div className="border-t border-deep-foreground/15 py-5">

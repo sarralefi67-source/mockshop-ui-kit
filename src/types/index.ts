@@ -884,7 +884,6 @@ export type Database = {
           tiktok_url: string | null
           updated_at: string
           whatsapp_url: string | null
-          favicon_url: string | null
           shipping_price: number
         }
         Insert: {
@@ -897,7 +896,6 @@ export type Database = {
           tiktok_url?: string | null
           updated_at?: string
           whatsapp_url?: string | null
-          favicon_url?: string | null
           shipping_price?: number
         }
         Update: {
@@ -910,7 +908,6 @@ export type Database = {
           tiktok_url?: string | null
           updated_at?: string
           whatsapp_url?: string | null
-          favicon_url?: string | null
           shipping_price?: number
         }
         Relationships: []

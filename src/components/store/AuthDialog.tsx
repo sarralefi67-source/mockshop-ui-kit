@@ -145,7 +145,7 @@ export function AuthDialog() {
                 autoComplete="new-password"
               />
             </div>
-            <div className="flex items-start gap-2">
+            {/* <div className="flex items-start gap-2">
               <Checkbox
                 id="auth-newsletter"
                 checked={newsletter}
@@ -154,7 +154,7 @@ export function AuthDialog() {
               <Label htmlFor="auth-newsletter" className="text-sm font-normal leading-snug">
                 Je souhaite recevoir la newsletter (promos et nouveautés).
               </Label>
-            </div>
+            </div> */}
             <div className="flex items-start gap-2">
               <Checkbox
                 id="auth-terms"
