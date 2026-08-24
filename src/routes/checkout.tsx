@@ -209,6 +209,21 @@ function CheckoutPage() {
       if (error) throw error;
       const result = data as { id: string; order_number: string; total: number };
 
+      // Complete the profile from the first checkout without overwriting
+      // information the customer has already saved in their account.
+      const profileUpdate = {
+        ...(profile?.first_name ? {} : { first_name: firstName.trim() || null }),
+        ...(profile?.last_name ? {} : { last_name: lastName.trim() || null }),
+        ...(profile?.phone ? {} : { phone: phone.trim() || null }),
+      };
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update(profileUpdate)
+          .eq("id", user!.id);
+        if (profileError) console.warn("complete profile from first order failed", profileError);
+      }
+
       // first time this address is used (not picked from the saved book):
       // persist it so it's pre-filled on the next order too
       if (!selectedAddressId) {
@@ -285,11 +300,11 @@ function CheckoutPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="prenom">Prénom</Label>
-                  <Input id="prenom" required placeholder="Sarra" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  <Input id="prenom" required placeholder="Tapez votre prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom</Label>
-                  <Input id="nom" required placeholder="Lefi" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  <Input id="nom" required placeholder="Tapez votre nom" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tel">Téléphone</Label>

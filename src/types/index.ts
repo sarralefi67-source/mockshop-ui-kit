@@ -1006,7 +1006,7 @@ export type Database = {
     }
     Functions: {
       get_admin_dashboard_kpis: {
-        Args: never
+        Args: { p_days?: number; p_end_date?: string }
         Returns: {
           customers: number
           orders: number
@@ -1019,7 +1019,7 @@ export type Database = {
         }
       }
       get_admin_monthly_sales: {
-          Args: { p_months?: number }
+          Args: { p_days?: number; p_end_date?: string }
           Returns: Array<{
             month: string
             total: number

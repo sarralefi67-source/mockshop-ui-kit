@@ -59,11 +59,11 @@ function ContactPage() {
         >
           <div className="space-y-2">
             <Label htmlFor="c-name">Nom complet</Label>
-            <Input id="c-name" required placeholder="Sarra Lefi" />
+            <Input id="c-name" required placeholder="Tapez votre nom complet" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="c-mail">E-mail</Label>
-            <Input id="c-mail" type="email" required placeholder="vous@example.tn" />
+            <Input id="c-mail" type="email" required placeholder="vous@example.com" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="c-msg">Message</Label>

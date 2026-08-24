@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Download, Eye, Plus, Trash2, Edit2, SlidersHorizontal, User, Phone, Mail, MapPin, FileText, Divide } from "lucide-react";
+import { Download, Eye, Plus, Trash2, Edit2, SlidersHorizontal, User, Phone, Mail, MapPin, FileText, FileDown, Divide } from "lucide-react";
 import { GOVERNORATES } from "@/data/governorates";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import SortArrow from "@/components/ui/sort-arrow";
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationLink, PaginationItem, PaginationPrevious, PaginationNext, PaginationEllipsis } from "@/components/ui/pagination";
 import { takeAdminFocus } from "@/lib/admin-focus";
+import { jsPDF } from "jspdf";
 
 export const Route = createFileRoute("/admin/commandes")({
   // Liens profonds depuis les notifications : `?order=<uuid>`, ou `?ref=<numéro>`
@@ -536,6 +537,98 @@ function AdminOrders() {
     setTimeout(() => w.print(), 300);
   };
 
+  const exportOrderPDF = (order: Order) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Bon de commande", 14, y);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Artisanat", pageWidth - 14, y, { align: "right" });
+    y += 10;
+    doc.setDrawColor(210, 210, 210);
+    doc.line(14, y, pageWidth - 14, y);
+    y += 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`Commande : ${order.reference}`, 14, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Date : ${order.created_at ? new Date(order.created_at).toLocaleDateString("fr-FR") : "-"}`, pageWidth - 14, y, { align: "right" });
+    y += 9;
+    doc.text(`Statut : ${(ORDER_STATUS_LABELS as any)[order.status] ?? order.status}`, 14, y);
+    y += 14;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Client", 14, y);
+    doc.setFont("helvetica", "normal");
+    y += 6;
+    [
+      ["Nom", order.customer_name],
+      ["Téléphone", order.customer_phone],
+      ["E-mail", order.customer_email],
+      ["Adresse", order.address_line],
+      ["Ville / Gouvernorat", [order.city, order.governorate].filter(Boolean).join(", ")],
+    ].forEach(([label, value]) => {
+      if (value) {
+        doc.text(`${label} : ${String(value)}`, 14, y);
+        y += 5;
+      }
+    });
+    y += 8;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Articles", 14, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.text("Produit", 14, y);
+    doc.text("Qté", 125, y);
+    doc.text("Prix", 145, y);
+    doc.text("Total", pageWidth - 14, y, { align: "right" });
+    y += 4;
+    doc.line(14, y, pageWidth - 14, y);
+    y += 7;
+
+    doc.setFont("helvetica", "normal");
+    order.items.forEach((item) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      const nameLines = doc.splitTextToSize(`${item.name}${item.variant_label ? ` - ${item.variant_label}` : ""}`, 100);
+      doc.text(nameLines, 14, y);
+      doc.text(String(item.quantity), 125, y);
+      doc.text(formatPrice(item.unit_price), 145, y);
+      doc.text(formatPrice(item.unit_price * item.quantity), pageWidth - 14, y, { align: "right" });
+      y += Math.max(7, nameLines.length * 5);
+    });
+
+    y += 5;
+    doc.line(110, y, pageWidth - 14, y);
+    y += 7;
+    doc.text("Sous-total", 110, y);
+    doc.text(formatPrice(order.subtotal), pageWidth - 14, y, { align: "right" });
+    y += 6;
+    doc.text("Livraison", 110, y);
+    doc.text(formatPrice(order.shipping), pageWidth - 14, y, { align: "right" });
+    if (order.discount > 0) {
+      y += 6;
+      doc.text("Remise", 110, y);
+      doc.text(`-${formatPrice(order.discount)}`, pageWidth - 14, y, { align: "right" });
+    }
+    y += 8;
+    doc.setFont("helvetica", "bold");
+    doc.text("Total à payer", 110, y);
+    doc.text(formatPrice(order.total), pageWidth - 14, y, { align: "right" });
+    y += 14;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Paiement à la livraison", 14, y);
+    doc.save(`bon-commande-${order.reference}.pdf`);
+  };
+
   const openEdit = (o: Order) => {
     // populate draft and items for editing
     setDraft((d) => ({
@@ -666,7 +759,8 @@ function AdminOrders() {
   );
   const displayedGovernorateValue = draft.governorate || governorateSearch;
 
-  const updateOrderItemQty = (productId: string, variantId: string | null, delta: number) => {
+  const updateOrderItemQty = (productId: string | null, variantId: string | null, delta: number) => {
+    if (!productId) return;
     setSelectedOrderItems((prev) =>
       prev
         .map((item) => (item.product_id === productId && (item.variant_id ?? null) === (variantId ?? null)
@@ -676,7 +770,8 @@ function AdminOrders() {
     );
   };
 
-  const removeOrderItem = (productId: string, variantId: string | null) => {
+  const removeOrderItem = (productId: string | null, variantId: string | null) => {
+    if (!productId) return;
     setSelectedOrderItems((prev) => prev.filter((item) => !(item.product_id === productId && (item.variant_id ?? null) === (variantId ?? null))));
   };
 
@@ -909,7 +1004,7 @@ function AdminOrders() {
       setValidatedCoupon(null);
       return;
     }
-    toast.success(`Coupon valide — ${data.discount_type === 'percentage' ? data.discount_value + '%' : formatPrice(data.discount_value)}`);
+    toast.success(`Coupon valide — ${data.discount_type === 'percentage' ? Number(data.discount_value ?? 0) + '%' : formatPrice(Number(data.discount_value ?? 0))}`);
     setValidatedCoupon(data);
   };
 
@@ -1061,6 +1156,9 @@ function AdminOrders() {
                     <div className="flex items-center justify-end gap-2">
                       <Button size="sm" variant="outline" onClick={() => setDetail(o)}>
                         <Eye className="h-5 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => exportOrderPDF(o)} aria-label="Télécharger le bon de commande">
+                        <FileDown className="h-4 w-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(o)} aria-label="Éditer">
                         <Edit2 className="h-4 w-4" />
@@ -1670,7 +1768,7 @@ function AdminOrders() {
               {/* status editor moved to DialogFooter */}
             </div>
           )}
-        <DialogFooter className="sticky bottom-0 left-0 right-0 border-t border-border p-2 bg-transparent">
+        <DialogFooter className="sticky bottom-0 left-0 right-0 z-10 -mx-6 -mb-4 border-t border-border bg-background px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {detail && (
             <div className="w-full">
               <p className="text-sm font-medium mb-2">Changer le statut</p>

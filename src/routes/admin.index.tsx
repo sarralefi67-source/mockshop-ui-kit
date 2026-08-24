@@ -23,6 +23,21 @@ type Kpis = {
   average_basket_delta_percent: number | null;
 };
 
+const PERIODS = [
+  { days: 7, label: "7 derniers jours" },
+  { days: 30, label: "30 derniers jours" },
+  { days: 180, label: "6 derniers mois" },
+  { days: 365, label: "12 derniers mois" },
+] as const;
+type PeriodSelection = number | "custom";
+
+const today = () => new Date().toISOString().slice(0, 10);
+const daysAgo = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+};
+
 function AdminDashboard() {
   const [lowStock, setLowStock] = useState<LowStockProduct[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
@@ -35,10 +50,17 @@ function AdminDashboard() {
   const [kpisLoading, setKpisLoading] = useState(true);
   const [salesByMonth, setSalesByMonth] = useState<MonthlySale[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
+  const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(180);
+  const [customStart, setCustomStart] = useState(() => daysAgo(6));
+  const [customEnd, setCustomEnd] = useState(today);
+  const periodDays = periodSelection === "custom"
+    ? Math.max(1, Math.round((new Date(`${customEnd}T00:00:00`).getTime() - new Date(`${customStart}T00:00:00`).getTime()) / 86_400_000) + 1)
+    : periodSelection;
+  const periodEndDate = periodSelection === "custom" ? customEnd : today();
 
-  const loadKpis = async () => {
+  const loadKpis = async (days = periodDays) => {
     setKpisLoading(true);
-    const { data, error } = await supabase.rpc("get_admin_dashboard_kpis");
+    const { data, error } = await supabase.rpc("get_admin_dashboard_kpis", { p_days: days, p_end_date: periodEndDate });
     if (error) console.error("load dashboard KPIs", error);
     else if (data) setKpis({
       customers: Number(data.customers ?? 0), orders: Number(data.orders ?? 0),
@@ -51,12 +73,15 @@ function AdminDashboard() {
     setKpisLoading(false);
   };
 
-  const loadMonthlySales = async () => {
+  const loadMonthlySales = async (days = periodDays) => {
     setSalesLoading(true);
-    const { data, error } = await supabase.rpc("get_admin_monthly_sales", { p_months: 6 });
+    const { data, error } = await supabase.rpc("get_admin_monthly_sales", { p_days: days, p_end_date: periodEndDate });
     if (error) console.error("load dashboard monthly sales", error);
     else setSalesByMonth((data ?? []).map((item) => ({
-      month: new Date(`${item.month}-01T00:00:00`).toLocaleDateString("fr-FR", { month: "short" }),
+      month: new Date(`${item.month}${item.month.length === 7 ? "-01" : ""}T00:00:00`).toLocaleDateString(
+        "fr-FR",
+        item.month.length === 7 ? { month: "short" } : { day: "2-digit", month: "2-digit" },
+      ),
       total: Number(item.total ?? 0),
     })));
     setSalesLoading(false);
@@ -79,20 +104,21 @@ function AdminDashboard() {
   };
 
   useEffect(() => {
-    loadKpis();
-    loadMonthlySales();
+    loadKpis(periodDays);
+    loadMonthlySales(periodDays);
     loadDashboardLists();
-    const channel = supabase.channel("admin-dashboard-kpis")
+    const channel = supabase.channel("admin-dashboard-kpis") as any;
+    channel
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        loadKpis();
-        loadMonthlySales();
+        loadKpis(periodDays);
+        loadMonthlySales(periodDays);
         loadDashboardLists();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadKpis)
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, loadDashboardLists)
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, []);
+  }, [periodDays, periodEndDate]);
 
   const cards = [
     { label: "Chiffre d'affaires", value: formatPrice(kpis.revenue), icon: Wallet, delta: kpis.revenue_delta_percent },
@@ -102,7 +128,33 @@ function AdminDashboard() {
   ];
 
   return <div className="space-y-6">
-    <div><h1 className="text-2xl font-bold">Dashboard</h1><p className="text-sm text-muted-foreground">Vue d'ensemble de l'activité en temps réel.</p></div>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div><h1 className="text-2xl font-bold">Dashboard</h1><p className="text-sm text-muted-foreground">Vue d'ensemble de l'activité en temps réel.</p></div>
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <span className="text-muted-foreground">Période</span>
+        <select
+          value={periodSelection}
+          onChange={(event) => setPeriodSelection(event.target.value === "custom" ? "custom" : Number(event.target.value))}
+          className="h-9 rounded-md border border-border bg-card px-3 text-sm outline-none focus:border-accent-strong"
+          aria-label="Filtrer le dashboard par période"
+        >
+          {PERIODS.map((period) => <option key={period.days} value={period.days}>{period.label}</option>)}
+          <option value="custom">Personnalisée</option>
+        </select>
+      </label>
+      {periodSelection === "custom" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-2">
+            <span className="text-muted-foreground">Du</span>
+            <input type="date" value={customStart} max={customEnd || today()} onChange={(event) => setCustomStart(event.target.value)} className="h-9 rounded-md border border-border bg-card px-2 outline-none focus:border-accent-strong" />
+          </label>
+          <label className="flex items-center gap-2">
+            <span className="text-muted-foreground">Au</span>
+            <input type="date" value={customEnd} min={customStart || undefined} max={today()} onChange={(event) => setCustomEnd(event.target.value)} className="h-9 rounded-md border border-border bg-card px-2 outline-none focus:border-accent-strong" />
+          </label>
+        </div>
+      )}
+    </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map(({ label, value, icon: Icon, delta }) => <div key={label} className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label}</span><Icon className="h-4 w-4 text-accent-strong" /></div>

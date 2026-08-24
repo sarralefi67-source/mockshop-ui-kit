@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,30 @@ function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+
+  async function handleForgotPassword() {
+    const address = email.trim();
+    if (!address) {
+      toast.error("Saisissez votre adresse e-mail.");
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(address, {
+        redirectTo: `${window.location.origin}/admin/login`,
+      });
+      if (error) throw error;
+      toast.success("Un e-mail de réinitialisation vous a été envoyé.");
+    } catch (err) {
+      console.error("admin password reset", err);
+      toast.error("Impossible d'envoyer l'e-mail de réinitialisation.");
+    } finally {
+      setResettingPassword(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,12 +99,39 @@ function AdminLogin() {
               <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
             </div>
             <div>
-              <Label>Mot de passe</Label>
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="admin-password">Mot de passe</Label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resettingPassword}
+                  className="text-xs text-accent-strong hover:underline disabled:opacity-50"
+                >
+                  {resettingPassword ? "Envoi…" : "Mot de passe oublié ?"}
+                </button>
+              </div>
+              <div className="relative mt-2">
+                <Input
+                  id="admin-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type={passwordVisible ? "text" : "password"}
+                  required
+                  className="pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((visible) => !visible)}
+                  aria-label={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
+                >
+                  {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Button type="submit" variant="accent" disabled={loading}>{loading ? "Connexion…" : "Se connecter"}</Button>
-              <Link to="/" className="text-sm text-muted-foreground hover:text-accent-strong">Retour site</Link>
+              <a href="/" className="text-sm text-muted-foreground hover:text-accent-strong">Retour à la boutique</a>
             </div>
           </form>
         </div>
