@@ -85,6 +85,13 @@ function CheckoutPage() {
   const [city, setCity] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [note, setNote] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const firstNameRef = useRef<HTMLInputElement>(null);
+  const lastNameRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const cityRef = useRef<HTMLInputElement>(null);
+  const governorateRef = useRef<HTMLButtonElement>(null);
 
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -174,14 +181,24 @@ function CheckoutPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!governorate) {
-      toast.error("Veuillez choisir un gouvernorat.");
+    const requiredFields = [
+      { key: "firstName", value: firstName, message: "Le prénom est obligatoire.", ref: firstNameRef },
+      { key: "lastName", value: lastName, message: "Le nom est obligatoire.", ref: lastNameRef },
+      { key: "phone", value: phone, message: "Le téléphone est obligatoire.", ref: phoneRef },
+      { key: "address", value: addressLine, message: "L'adresse est obligatoire.", ref: addressRef },
+      { key: "city", value: city, message: "La ville est obligatoire.", ref: cityRef },
+      { key: "governorate", value: governorate, message: "Le gouvernorat est obligatoire.", ref: governorateRef },
+    ];
+    const firstInvalid = requiredFields.find((field) => !field.value.trim());
+    if (firstInvalid) {
+      setFieldErrors({ [firstInvalid.key]: firstInvalid.message });
+      window.requestAnimationFrame(() => {
+        firstInvalid.ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        firstInvalid.ref.current?.focus({ preventScroll: true });
+      });
       return;
     }
-    if (!phone.trim() || !addressLine.trim() || !city.trim()) {
-      toast.error("Veuillez compléter vos coordonnées et votre adresse.");
-      return;
-    }
+    setFieldErrors({});
 
     setSubmitting(true);
     try {
@@ -293,22 +310,25 @@ function CheckoutPage() {
       <div className="container-page py-10">
         <h1 className="page-title text-3xl">Finaliser ma commande</h1>
 
-        <form onSubmit={handleSubmit} className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
+        <form noValidate onSubmit={handleSubmit} className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px]">
           <div className="space-y-6">
             <section className="rounded-xl border border-border bg-card p-6">
               <h2 className="text-lg font-bold">Coordonnées</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="prenom">Prénom</Label>
-                  <Input id="prenom" required placeholder="Tapez votre prénom" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  <Input ref={firstNameRef} id="prenom" required placeholder="Tapez votre prénom" value={firstName} onChange={(e) => { setFirstName(e.target.value); setFieldErrors((errors) => ({ ...errors, firstName: "" })); }} className={cn(fieldErrors["firstName"] && "border-red-600 focus-visible:border-red-600 focus-visible:ring-red-600")} />
+                  {fieldErrors["firstName"] && <p className="text-sm text-red-600">{fieldErrors["firstName"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom</Label>
-                  <Input id="nom" required placeholder="Tapez votre nom" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  <Input ref={lastNameRef} id="nom" required placeholder="Tapez votre nom" value={lastName} onChange={(e) => { setLastName(e.target.value); setFieldErrors((errors) => ({ ...errors, lastName: "" })); }} className={cn(fieldErrors["lastName"] && "border-red-600 focus-visible:border-red-600 focus-visible:ring-red-600")} />
+                  {fieldErrors["lastName"] && <p className="text-sm text-red-600">{fieldErrors["lastName"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="tel">Téléphone</Label>
-                  <Input id="tel" required type="tel" placeholder="+216 22 000 000" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input ref={phoneRef} id="tel" required type="tel" placeholder="+216 22 000 000" value={phone} onChange={(e) => { setPhone(e.target.value); setFieldErrors((errors) => ({ ...errors, phone: "" })); }} className={cn(fieldErrors["phone"] && "border-red-600 focus-visible:border-red-600 focus-visible:ring-red-600")} />
+                  {fieldErrors["phone"] && <p className="text-sm text-red-600">{fieldErrors["phone"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mail">E-mail (optionnel)</Label>
@@ -358,22 +378,25 @@ function CheckoutPage() {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="adresse">Adresse</Label>
-                  <Input id="adresse" required placeholder="12 rue de la Liberté, Apt 4" value={addressLine} onChange={(e) => setAddressLine(e.target.value)} />
+                  <Input ref={addressRef} id="adresse" required placeholder="12 rue de la Liberté, Apt 4" value={addressLine} onChange={(e) => { setAddressLine(e.target.value); setFieldErrors((errors) => ({ ...errors, address: "" })); }} className={cn(fieldErrors["address"] && "border-red-600 focus-visible:border-red-600 focus-visible:ring-red-600")} />
+                  {fieldErrors["address"] && <p className="text-sm text-red-600">{fieldErrors["address"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ville">Ville</Label>
-                  <Input id="ville" required placeholder="Le Bardo" value={city} onChange={(e) => setCity(e.target.value)} />
+                  <Input ref={cityRef} id="ville" required placeholder="Le Bardo" value={city} onChange={(e) => { setCity(e.target.value); setFieldErrors((errors) => ({ ...errors, city: "" })); }} className={cn(fieldErrors["city"] && "border-red-600 focus-visible:border-red-600 focus-visible:ring-red-600")} />
+                  {fieldErrors["city"] && <p className="text-sm text-red-600">{fieldErrors["city"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="gov">Gouvernorat</Label>
-                  <Select value={governorate} onValueChange={setGovernorate}>
-                    <SelectTrigger id="gov"><SelectValue placeholder={availableGovernorates.length ? "Choisir…" : "Aucun gouvernorat disponible"} /></SelectTrigger>
+                  <Select value={governorate} onValueChange={(value) => { setGovernorate(value); setFieldErrors((errors) => ({ ...errors, governorate: "" })); }}>
+                    <SelectTrigger ref={governorateRef} id="gov" className={cn(fieldErrors["governorate"] && "border-red-600 focus:ring-red-600")}><SelectValue placeholder={availableGovernorates.length ? "Choisir…" : "Aucun gouvernorat disponible"} /></SelectTrigger>
                     <SelectContent className="max-h-72">
                       {availableGovernorates.map((g) => (
                         <SelectItem key={g} value={g}>{g}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {fieldErrors["governorate"] && <p className="text-sm text-red-600">{fieldErrors["governorate"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cp">Code postal</Label>

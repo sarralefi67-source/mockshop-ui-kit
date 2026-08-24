@@ -59,16 +59,15 @@ const pages: Record<string, { title: string; intro: string; sections: PageSectio
 pages["confidentialite"] = {
   title: "Politique de confidentialité",
   intro:
-    "Dernière mise à jour : avril 2026. La protection de vos données personnelles est une priorité pour Artisanat. Nous nous engageons à traiter vos informations avec la plus grande confidentialité et transparence.",
+    "Dernière mise à jour : 24 août 2026. La protection de vos données personnelles est une priorité pour Artisanat. Nous nous engageons à traiter vos informations avec la plus grande confidentialité et transparence.",
   sections: [
     {
       heading: "Données collectées",
       body: "Lors de votre navigation et de vos achats sur notre site, nous sommes amenés à collecter les informations suivantes :",
       items: [
         "Nom, prénom et coordonnées (e-mail, téléphone, adresse de livraison)",
-        "Données de paiement (traitées de manière sécurisée, non stockées)",
         "Historique de commandes et préférences produits",
-        "Données de navigation (cookies, pages visitées)",
+        
       ],
     },
     {
@@ -99,7 +98,7 @@ pages["confidentialite"] = {
 pages["remboursement"] = {
   title: "Politique de remboursement",
   intro:
-    "Dernière mise à jour : avril 2026. Votre satisfaction est notre priorité. Nous acceptons les retours sous certaines conditions afin de vous garantir une expérience d'achat en toute confiance.",
+    "Dernière mise à jour : 24 août 2026. Votre satisfaction est notre priorité. Nous acceptons les retours sous certaines conditions afin de vous garantir une expérience d'achat en toute confiance.",
   sections: [
     {
       heading: "Conditions de retour",
