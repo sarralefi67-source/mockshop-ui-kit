@@ -47,14 +47,14 @@ export function Footer() {
         ))}
       </div>
 
-      <div className="container-page grid gap-8 py-12 md:grid-cols-3">
+      <div className="container-page grid gap-4 py-12 md:grid-cols-[1.35fr_1fr_1.2fr_1fr]">
         <div>
           <span className="font-display text-2xl font-semibold tracking-tight text-deep-foreground">
             Arti<span className="text-ocre">sanat</span>
           </span>
           <p className="mt-3 text-sm text-deep-foreground/70">
-            Votre boutique high-tech et maison en Tunisie. Des produits sélectionnés, livrés chez
-            vous, payés à la livraison.
+            Découvrez l’artisanat tunisien à travers des créations authentiques, sélectionnées avec
+            soin et livrées chez vous partout en Tunisie.
           </p>
           <ul className="mt-4 space-y-2 text-sm text-deep-foreground/70">
             {settings?.phone && (
@@ -83,6 +83,15 @@ export function Footer() {
 
         <div>
           <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Informations</h3>
+          <ul className="mt-4 space-y-2">
+            <li><Link to="/" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Accueil</Link></li>
+            <li><Link to="/promotions" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Promotions</Link></li>
+            <li><Link to="/inscription" className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">Suivre ma commande</Link></li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Obtenir de l'aide</h3>
           <ul className="mt-4 space-y-2">
             {/* <li><Link to="/pages/$slug" params={{ slug: "cgv" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGV</Link></li>
             <li><Link to="/pages/$slug" params={{ slug: "cgu" }} className="text-sm text-deep-foreground/70 transition-colors hover:text-ocre">CGU</Link></li>

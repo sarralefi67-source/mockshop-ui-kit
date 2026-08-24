@@ -378,17 +378,16 @@ function CheckoutPage() {
                 <div>
                   <p className="font-semibold">Paiement à la livraison (COD)</p>
                   <p className="text-sm text-muted-foreground">
-                    Vous réglez en espèces au livreur à la réception de votre colis. Aucun paiement
-                    en ligne n'est demandé.
+                    Vous réglez en espèces au livreur à la réception de votre colis.
                   </p>
                 </div>
               </div>
-              <div className="mt-4 flex items-start gap-2">
+              {/* <div className="mt-4 flex items-start gap-2">
                 <Checkbox id="cgv" required />
                 <Label htmlFor="cgv" className="text-sm font-normal leading-snug">
                   J'accepte les conditions générales de vente et confirme mes coordonnées.
                 </Label>
-              </div>
+              </div> */}
             </section>
           </div>
 

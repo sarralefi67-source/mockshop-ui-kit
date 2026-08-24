@@ -37,7 +37,7 @@ function ConfirmationPage() {
             <Banknote className="h-5 w-5 text-accent-strong" />
             <p className="mt-2 font-semibold">Paiement à la livraison</p>
             <p className="text-sm text-muted-foreground">
-              Préparez le montant exact en espèces à remettre au livreur.
+              Payer en argent comptant à la livraison.
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-5">
