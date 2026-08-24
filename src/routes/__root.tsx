@@ -81,14 +81,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Nexa Store — Boutique high-tech en Tunisie" },
-      { name: "description", content: "Informatique, téléphonie, maison et accessoires. Paiement à la livraison partout en Tunisie." },
-      
-      { property: "og:title", content: "Nexa Store — Boutique high-tech en Tunisie" },
-      { property: "og:description", content: "Informatique, téléphonie, maison et accessoires. Paiement à la livraison." },
+      { title: "Artisanat : Boutique d'artisanat en Tunisie" },
+      { name: "description", content: "Artisanat tunisien, décoration, poterie et créations locales. Paiement à la livraison partout en Tunisie." },
+      { property: "og:title", content: "Artisanat — Boutique tunisienne" },
+      { property: "og:description", content: "Découvrez l'artisanat tunisien : décoration, poterie, textile et créations locales." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@Artisanat" },
     ],
     links: [
       {
@@ -112,7 +111,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <head>
         <HeadContent />
       </head>

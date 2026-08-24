@@ -15,16 +15,16 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Artisanat — High-tech, maison & accessoires en Tunisie" },
+      { title: "Artisanat — Boutique tunisienne" },
       {
         name: "description",
         content:
-          "Découvrez nos PC, smartphones, audio et électroménager. Livraison 24/48h et paiement à la livraison partout en Tunisie.",
+          "Découvrez l'artisanat tunisien : décoration, poterie, textile et créations locales. Paiement à la livraison partout en Tunisie.",
       },
-      { property: "og:title", content: "Artisanat : High-tech & maison en Tunisie" },
+      { property: "og:title", content: "Artisanat : Boutique tunisienne" },
       {
         property: "og:description",
-        content: "PC, smartphones, audio, électroménager. Paiement à la livraison.",
+        content: "Décoration, poterie, textile et créations locales. Paiement à la livraison.",
       },
     ],
   }),
