@@ -109,6 +109,31 @@ create trigger trg_notify_low_stock_variant
 after update of stock_quantity on public.product_variants
 for each row execute function public.notify_low_stock_variant();
 
+-- Diffusion realtime du stock sur les fiches produit publiques.
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'products'
+  ) then
+    alter publication supabase_realtime add table public.products;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'product_variants'
+  ) then
+    alter publication supabase_realtime add table public.product_variants;
+  end if;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Droits d'insertion des triggers
 -- ---------------------------------------------------------------------------

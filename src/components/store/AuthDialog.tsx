@@ -79,7 +79,7 @@ export function AuthDialog() {
           if (newsletterError) console.warn("newsletter subscribe on signup failed:", newsletterError);
         });
     }
-    finish("Compte créé — vérifiez votre e-mail si une confirmation est requise.");
+    finish("Compte créé : vérifiez votre e-mail si une confirmation est requise.");
   };
 
   return (

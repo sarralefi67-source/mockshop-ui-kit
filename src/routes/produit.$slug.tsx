@@ -79,6 +79,10 @@ function ProductPage() {
   });
   const [quantity, setQuantity] = useState(1);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [liveProductStock, setLiveProductStock] = useState(product.stock);
+  const [liveVariantStocks, setLiveVariantStocks] = useState<Record<string, number>>(() =>
+    Object.fromEntries(product.variants.map((item) => [item.id, item.stock])),
+  );
 
   // All images stay visible as thumbnails; picking an attribute value just
   // moves the focused/main image to the one tagged with that value
@@ -117,13 +121,40 @@ function ProductPage() {
 
   const price = variant?.price ?? product.price;
   const compareAt = variant?.compare_at_price ?? product.compare_at_price;
-  const stock = variant ? variant.stock : product.stock;
+  const stock = variant ? liveVariantStocks[variant.id] ?? variant.stock : liveProductStock;
   const onSale = compareAt !== null && compareAt > price;
 
   const variantLabel = product.attributes
     .map((attr) => attr.values.find((v) => v.id === selection[attr.code])?.label)
     .filter(Boolean)
     .join(" / ");
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`product-stock-${product.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "products", filter: `id=eq.${product.id}` },
+        (payload) => {
+          const nextStock = Number((payload.new as { stock_quantity?: number | null }).stock_quantity ?? 0);
+          setLiveProductStock(nextStock);
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "product_variants", filter: `product_id=eq.${product.id}` },
+        (payload) => {
+          const row = payload.new as { id?: string; stock_quantity?: number | null };
+          if (!row.id) return;
+          setLiveVariantStocks((previous) => ({ ...previous, [row.id!]: Number(row.stock_quantity ?? 0) }));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [product.id]);
 
   const [categories, setCategories] = useState<Awaited<ReturnType<typeof fetchCategories>>>([]);
   const [related, setRelated] = useState<Product[]>([]);
@@ -404,7 +435,7 @@ function ProductPage() {
                   <span className="text-muted-foreground">({stock} disponibles)</span>
                 </>
               ) : (
-                <span className="font-medium text-destructive">Rupture de stock</span>
+                <span className="text-lg font-extrabold text-red-600">Rupture de stock</span>
               )}
             </div>
 

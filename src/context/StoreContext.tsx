@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CartItem } from "@/types";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { useAuth } from "@/context/AuthContext";
@@ -31,14 +31,65 @@ interface StoreContextValue {
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
+const GUEST_CART_KEY = "artisanat:cart:guest";
+const userCartKey = (userId: string) => `artisanat:cart:user:${userId}`;
+
+function readCart(key: string): CartItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeCarts(...carts: CartItem[][]): CartItem[] {
+  const merged = new Map<string, CartItem>();
+  carts.flat().forEach((item) => {
+    const existing = merged.get(item.key);
+    if (!existing) {
+      merged.set(item.key, item);
+      return;
+    }
+    merged.set(item.key, {
+      ...existing,
+      quantity: Math.min(existing.max_stock || 99, existing.quantity + item.quantity),
+    });
+  });
+  return [...merged.values()];
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const { settings } = useSiteSettings();
   const shippingPrice = settings?.shipping_price ?? 0;
   const [items, setItems] = useState<CartItem[]>([]);
+  const storageKey = profile ? userCartKey(profile.id) : GUEST_CART_KEY;
+  const hydratedStorageKey = useRef<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+
+  // Restore the guest cart after a reload, then merge it into the user's cart
+  // when authentication becomes available (including after email verification).
+  useEffect(() => {
+    hydratedStorageKey.current = null;
+    const savedCart = readCart(storageKey);
+    const nextCart = profile ? mergeCarts(savedCart, readCart(GUEST_CART_KEY)) : savedCart;
+    setItems(nextCart);
+    hydratedStorageKey.current = storageKey;
+
+    if (profile && typeof window !== "undefined") {
+      window.localStorage.setItem(storageKey, JSON.stringify(nextCart));
+      window.localStorage.removeItem(GUEST_CART_KEY);
+    }
+  }, [profile, storageKey]);
+
+  useEffect(() => {
+    if (hydratedStorageKey.current !== storageKey || typeof window === "undefined") return;
+    window.localStorage.setItem(storageKey, JSON.stringify(items));
+  }, [items, storageKey]);
 
   const addItem = useCallback((item: Omit<CartItem, "key" | "quantity">, quantity = 1) => {
     const key = `${item.product_id}::${item.variant_id ?? "default"}`;
