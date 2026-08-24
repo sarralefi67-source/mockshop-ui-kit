@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Artisanat : Boutique d'artisanat en Tunisie" },
       { name: "description", content: "Artisanat tunisien, décoration, poterie et créations locales. Paiement à la livraison partout en Tunisie." },
-      { property: "og:title", content: "Artisanat — Boutique tunisienne" },
+      { property: "og:title", content: "Artisanat : Boutique tunisienne" },
       { property: "og:description", content: "Découvrez l'artisanat tunisien : décoration, poterie, textile et créations locales." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
