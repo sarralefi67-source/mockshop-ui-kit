@@ -84,7 +84,7 @@ function HomePage() {
     <StoreLayout>
       {/* Hero */}
       {banners.length > 0 && (
-        <section className="border-b border-surface bg-surface">
+        <section className="border-b border-surface bg-surface ">
           <Carousel setApi={setCarouselApi} opts={{ loop: true }}>
             <CarouselContent>
               {banners.map((banner) => {

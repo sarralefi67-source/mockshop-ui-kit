@@ -56,39 +56,21 @@ function BannerPage() {
   return (
     <StoreLayout>
       {/* Visuel de la bannière, repris tel quel depuis l'accueil */}
-      <section className="border-b border-surface bg-surface">
-        <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[3/1]">
-          <img src={banner.image_url} alt={banner.title ?? ""} className="h-full w-full object-cover" />
-          {(banner.title || banner.subtitle) && (
-            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-foreground/60 via-foreground/10 to-transparent p-6 sm:p-10">
+      
+          <div className="text-center px-4 py-10 sm:px-6 lg:px-8">
               {banner.title && (
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-background sm:text-4xl">{banner.title}</h1>
+                <h1 className="font-display text-2xl font-semibold tracking-tight  sm:text-4xl">{banner.title}</h1>
               )}
               {banner.subtitle && (
-                <p className="mt-2 max-w-md text-sm text-background/90 sm:text-base">{banner.subtitle}</p>
+                <p className="mx-auto mt-2 max-w-md text-sm sm:text-base">{banner.subtitle}</p>
               )}
             </div>
-          )}
-        </div>
-      </section>
 
-      <div className="container-page py-8">
-        <nav className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-          <Link to="/" className="hover:text-accent-strong">Accueil</Link>
-          <span>/</span>
-          <span className="text-foreground">{banner.title || "Sélection"}</span>
-        </nav>
+     
 
-        <div className="mt-4">
-          {!banner.title && <h1 className="page-title text-3xl">Sélection</h1>}
-          <p className="mt-1 text-sm text-muted-foreground">
-            {loading
-              ? "Chargement des produits…"
-              : `${products.length} produit${products.length > 1 ? "s" : ""} dans cette sélection`}
-          </p>
-        </div>
-
-        <div className="mt-8">
+      <div className="container-page">
+      
+        <div className="mt-2">
           {loading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}

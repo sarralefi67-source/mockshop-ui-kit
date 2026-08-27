@@ -44,7 +44,7 @@ function ConfirmationPage() {
             <Truck className="h-5 w-5 text-accent-strong" />
             <p className="mt-2 font-semibold">Livraison 24/48h</p>
             <p className="text-sm text-muted-foreground">
-              Vous recevrez un SMS dès que le colis part de notre entrepôt.
+              Livraison rapide et sécurisée à votre domicile.
             </p>
           </div>
         </div>
