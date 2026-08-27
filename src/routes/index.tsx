@@ -186,7 +186,7 @@ function HomePage() {
       {/* Nouveautés */}
       {!loading && nouveautes.length > 0 && (
         <section className="container-page py-8">
-          <h2 className="page-title text-2xl">Nouveautés</h2>
+          <h2 className="section-title">Nouveautés</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {nouveautes.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>

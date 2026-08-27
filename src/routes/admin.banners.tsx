@@ -14,6 +14,7 @@ import Spinner from "@/components/ui/spinner";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/admin/banners")({
   component: AdminBanners,
@@ -43,6 +44,7 @@ function AdminBanners() {
   const [draft, setDraft] = useState<BannerDraft | null>(null);
   const [products, setProducts] = useState<{ id: string; sku: string | null; slug: string | null }[]>([]);
   const [productSearch, setProductSearch] = useState("");
+  const [productSelectOpen, setProductSelectOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -245,7 +247,7 @@ function AdminBanners() {
       )}
 
       <Dialog open={draft !== null} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{draft?.id ? "Modifier la bannière" : "Nouvelle bannière"}</DialogTitle>
           </DialogHeader>
@@ -253,7 +255,7 @@ function AdminBanners() {
             <div className="space-y-4">
               <div>
                 <Label>Image</Label>
-                <div className="mt-2 flex items-center gap-3">
+                <label className="relative mt-2 block w-fit cursor-pointer">
                   {draft.image_url ? (
                     <img src={draft.image_url} alt="" className="h-20 w-36 rounded-md border border-border object-cover" />
                   ) : (
@@ -261,20 +263,22 @@ function AdminBanners() {
                       <ImagePlus className="h-6 w-6" />
                     </div>
                   )}
-                  <label className="cursor-pointer text-sm font-semibold text-accent-strong hover:underline">
-                    {uploading ? "Envoi…" : draft.image_url ? "Changer l'image" : "Choisir une image"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleUpload(file);
-                      }}
-                    />
-                  </label>
-                </div>
+                  {uploading && (
+                    <span className="absolute inset-0 grid place-items-center rounded-md bg-background/70 text-xs font-semibold">
+                      Envoi…
+                    </span>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleUpload(file);
+                    }}
+                  />
+                </label>
               </div>
               <div className="space-y-2">
                 <Label>Titre (optionnel)</Label>
@@ -285,43 +289,56 @@ function AdminBanners() {
                 <Input value={draft.subtitle ?? ""} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} placeholder="Découvrez nos pièces artisanales" />
               </div>
               <div className="space-y-2">
-                <Label>Lien automatique</Label>
+                {/* <Label>Lien automatique</Label>
                 <Input
                   value={bannerLink(draft.id) || "Généré à la création de la bannière"}
                   readOnly
-                />
+                /> */}
                 <p className="text-xs text-muted-foreground">
                   Un clic sur la bannière ouvre cette page, qui affiche les produits associés ci-dessous.
                 </p>
               </div>
               <div className="space-y-2">
                 <Label>Produits associés</Label>
-                <Input
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Rechercher par SKU"
-                />
-                <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-border p-3">
-                  {products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun produit actif.</p>
-                  ) : products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).slice(0, 30).map((product) => {
-                    const checked = draft.product_ids?.includes(product.id) ?? false;
-                    return (
-                      <label key={product.id} className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(value) => setDraft({
-                            ...draft,
-                            product_ids: value
-                              ? [...(draft.product_ids ?? []), product.id]
-                              : (draft.product_ids ?? []).filter((id) => id !== product.id),
-                          })}
-                        />
-                        <span>{product.sku || "SKU non défini"}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                <Popover open={productSelectOpen} onOpenChange={setProductSelectOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                      {draft.product_ids?.length
+                        ? `${draft.product_ids.length} produit${draft.product_ids.length > 1 ? "s" : ""} sélectionné${draft.product_ids.length > 1 ? "s" : ""}`
+                        : "Sélectionner des produits"}
+                      <span className="text-muted-foreground">⌄</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+                    <Input
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Rechercher par SKU"
+                      autoFocus
+                    />
+                    <div className="mt-2 max-h-44 space-y-2 overflow-y-auto">
+                      {products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).length === 0 ? (
+                        <p className="px-1 py-2 text-sm text-muted-foreground">Aucun produit actif.</p>
+                      ) : products.filter((product) => (product.sku ?? "").toLowerCase().includes(productSearch.trim().toLowerCase())).slice(0, 30).map((product) => {
+                        const checked = draft.product_ids?.includes(product.id) ?? false;
+                        return (
+                          <label key={product.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-surface">
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(value) => setDraft({
+                                ...draft,
+                                product_ids: value
+                                  ? [...new Set([...(draft.product_ids ?? []), product.id])]
+                                  : (draft.product_ids ?? []).filter((id) => id !== product.id),
+                              })}
+                            />
+                            <span>{product.sku || "SKU non défini"}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex items-center gap-3">
                 <Switch checked={draft.is_active ?? true} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
