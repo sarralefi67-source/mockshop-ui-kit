@@ -209,7 +209,7 @@ function mapOrderRow(r: any): Order {
         id: it.id,
         product_id: it.product_id,
         variant_id: it.variant_id,
-        name: it.product_name || it.product_id || "Article",
+        name: it.product_name || "Article",
         sku: it.sku || it.products?.sku || null,
         variant_label: it.variant_label || null,
         image: mainImage,
@@ -262,6 +262,27 @@ function AdminOrders() {
   const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [orderFieldErrors, setOrderFieldErrors] = useState<Record<string, string>>({});
+
+  const getMissingOrderAddressField = () => {
+    if (!draft.customer_name.trim()) return { key: "customer_name", message: "Le nom du client est requis." };
+    if (!draft.customer_phone.trim()) return { key: "customer_phone", message: "Le téléphone est obligatoire." };
+    if (!draft.address_line.trim()) return { key: "address_line", message: "L'adresse est obligatoire." };
+    if (!draft.city.trim()) return { key: "city", message: "La ville est obligatoire." };
+    if (!draft.governorate.trim()) return { key: "governorate", message: "Le gouvernorat est obligatoire." };
+    return null;
+  };
+
+  const validateOrderAddress = () => {
+    const missingField = getMissingOrderAddressField();
+    if (!missingField) {
+      setOrderFieldErrors({});
+      return true;
+    }
+    setOrderFieldErrors({ [missingField.key]: missingField.message });
+    document.getElementById(`order-${missingField.key}`)?.focus();
+    return false;
+  };
 
   const getVariantLabel = (product: CatalogProduct | null, variant: CatalogProduct["variants"][number] | null | undefined) => {
     if (!product || !variant) return "Variation";
@@ -335,7 +356,7 @@ function AdminOrders() {
           price: Number(product.base_price ?? product.price ?? 0),
           compare_at_price: product.compare_at_price ? Number(product.compare_at_price) : null,
           stock: Number(product.stock_quantity ?? 0),
-          sku: product.sku ?? product.id,
+          sku: product.sku ?? "",
           is_active: product.is_active ?? true,
           is_new: false,
           rating: 0,
@@ -364,7 +385,7 @@ function AdminOrders() {
             return {
               id: variant.id,
               product_id: variant.product_id ?? product.id,
-              sku: variant.sku ?? variant.id,
+              sku: variant.sku ?? "",
               options,
               price: Number(variant.price ?? product.base_price ?? 0),
               compare_at_price: variant.compare_at_price ? Number(variant.compare_at_price) : null,
@@ -631,7 +652,7 @@ function AdminOrders() {
       }
       const itemLabel = `${item.name}${item.variant_label ? ` - ${item.variant_label}` : ""}`;
       const nameLines = doc.splitTextToSize(
-        `${itemLabel}\nSKU : ${item.sku || "Non défini"}`,
+        item.sku ? `${itemLabel}\nSKU : ${item.sku}` : itemLabel,
         100,
       );
       doc.text(nameLines, 14, y);
@@ -712,7 +733,7 @@ function AdminOrders() {
     }
     const price = Number(variant ? variant.price : product.price ?? 0);
     const image = product.images?.find((img) => img.is_main)?.url ?? product.images?.[0]?.url ?? null;
-    const sku = variant?.sku ?? product.sku ?? product.id;
+    const sku = variant?.sku ?? product.sku ?? null;
     const variantLabel = getVariantLabel(product, variant) || sku;
     const itemQty = Math.max(1, Number(selectedQty) || 1);
     const stockQty = variant ? Number(variant.stock ?? 0) : Number(product.stock ?? 0);
@@ -725,11 +746,19 @@ function AdminOrders() {
       return;
     }
 
+    const existingItem = selectedOrderItems.find(
+      (item) => item.product_id === product.id && item.variant_id === (variant?.id ?? null),
+    );
+    if (existingItem && existingItem.quantity >= stockQty) {
+      toast.error(`Stock maximum déjà ajouté au panier (${stockQty}).`);
+      return;
+    }
+
     setSelectedOrderItems((prev) => {
       const current = prev.find((item) => item.product_id === product.id && item.variant_id === (variant?.id ?? null));
       if (current) {
         return prev.map((item) => item.product_id === product.id && item.variant_id === (variant?.id ?? null)
-          ? { ...item, quantity: item.quantity + itemQty }
+          ? { ...item, quantity: itemQty }
           : item);
       }
       return [
@@ -767,7 +796,7 @@ function AdminOrders() {
     if (!q) return true;
     return (
       product.name.toLowerCase().includes(q) ||
-      (product.sku || product.id).toLowerCase().includes(q)
+      (product.sku || "").toLowerCase().includes(q)
     );
   });
   const displayedProductValue = selectedProduct ? selectedProduct.name : productSearch;
@@ -799,6 +828,19 @@ function AdminOrders() {
 
   const updateOrderItemQty = (productId: string | null, variantId: string | null, delta: number) => {
     if (!productId) return;
+    if (delta > 0) {
+      const product = catalogProducts.find((item) => item.id === productId);
+      const stock = variantId
+        ? Number(product?.variants.find((variant) => variant.id === variantId)?.stock ?? 0)
+        : Number(product?.stock ?? 0);
+      const currentItem = selectedOrderItems.find(
+        (item) => item.product_id === productId && (item.variant_id ?? null) === (variantId ?? null),
+      );
+      if (currentItem && currentItem.quantity >= stock) {
+        toast.error(`Stock maximum atteint (${stock}).`);
+        return;
+      }
+    }
     setSelectedOrderItems((prev) =>
       prev
         .map((item) => (item.product_id === productId && (item.variant_id ?? null) === (variantId ?? null)
@@ -814,11 +856,10 @@ function AdminOrders() {
   };
 
   const createOrder = async () => {
-    const customerName = draft.customer_name.trim();
-    if (!customerName) {
-      toast.error("Le nom du client est requis.");
+    if (!validateOrderAddress()) {
       return;
     }
+    const customerName = draft.customer_name.trim();
     if (selectedOrderItems.length === 0) {
       toast.error("Ajoute au moins un article pour créer la commande.");
       return;
@@ -836,13 +877,17 @@ function AdminOrders() {
           : Number(validatedCoupon.discount_value ?? 0))
       : 0;
     const total = subtotal + shipping - couponDiscount;
-    const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-
     const paymentMethodValue = "cod";
-    const billingAddress = null;
+    const orderAddress = {
+      full_name: customerName,
+      email: draft.customer_email.trim() || null,
+      phone: draft.customer_phone,
+      governorate: draft.governorate,
+      city: draft.city,
+      address_line: draft.address_line,
+    };
 
     const payload = {
-      order_number: orderNumber,
       status: draft.status,
       coupon_id: validatedCoupon?.id ?? null,
       user_id: profile?.id ?? null,
@@ -851,20 +896,15 @@ function AdminOrders() {
       shipping_amount: shipping,
       total,
       payment_method: paymentMethodValue,
-      shipping_address: {
-        full_name: customerName,
-        email: draft.customer_email.trim() || null,
-        phone: draft.customer_phone,
-        governorate: draft.governorate,
-        city: draft.city,
-        address_line: draft.address_line,
-      },
-      billing_address: billingAddress,
+      shipping_address: orderAddress,
+      billing_address: orderAddress,
       notes: draft.note.trim() || null,
       created_at: new Date().toISOString(),
     };
 
     setIsSubmitting(true);
+    const decrementedStock: Array<{ table: "products" | "product_variants"; id: string; quantity: number }> = [];
+    let createdOrderId: string | null = null;
     try {
 
     if (!editingOrderId) {
@@ -894,7 +934,38 @@ function AdminOrders() {
         return;
       }
 
+      for (const item of selectedOrderItems) {
+        if (!item.product_id) continue;
+        const quantity = Number(item.quantity);
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw new Error("Quantité de commande invalide.");
+        }
+
+        const table = item.variant_id ? "product_variants" : "products";
+        const stockId = item.variant_id ?? item.product_id;
+        const { data: stockRow, error: stockReadError } = await supabase
+          .from(table)
+          .select("stock_quantity")
+          .eq("id", stockId)
+          .maybeSingle();
+        if (stockReadError) throw stockReadError;
+        const currentStock = Number(stockRow?.stock_quantity ?? 0);
+        if (!stockRow || currentStock < quantity) {
+          throw new Error(`Stock insuffisant pour ${item.name}.`);
+        }
+        const { data: updatedRows, error: stockError } = await supabase
+          .from(table)
+          .update({ stock_quantity: currentStock - quantity })
+          .eq("id", stockId)
+          .gte("stock_quantity", quantity)
+          .select("id");
+        if (stockError) throw stockError;
+        if (!updatedRows?.length) throw new Error(`Stock insuffisant pour ${item.name}.`);
+        decrementedStock.push({ table, id: stockId, quantity });
+      }
+
       var result = data as any;
+      createdOrderId = data.id;
     } else {
       // Update existing order
       const orderId = editingOrderId;
@@ -907,15 +978,8 @@ function AdminOrders() {
         shipping_amount: shipping,
         total,
         payment_method: paymentMethodValue,
-        shipping_address: {
-          full_name: customerName,
-          email: draft.customer_email.trim() || null,
-          phone: draft.customer_phone,
-          governorate: draft.governorate,
-          city: draft.city,
-          address_line: draft.address_line,
-        },
-        billing_address: billingAddress,
+        shipping_address: orderAddress,
+        billing_address: orderAddress,
         notes: draft.note.trim() || null,
       };
 
@@ -957,6 +1021,22 @@ function AdminOrders() {
     }
     } catch (e) {
       console.error(e);
+      for (const stock of decrementedStock) {
+        const { data: stockRow } = await supabase
+          .from(stock.table)
+          .select("stock_quantity")
+          .eq("id", stock.id)
+          .maybeSingle();
+        if (stockRow) {
+          await supabase
+            .from(stock.table)
+            .update({ stock_quantity: Number(stockRow.stock_quantity ?? 0) + stock.quantity })
+            .eq("id", stock.id);
+        }
+      }
+      if (createdOrderId) {
+        await supabase.from("orders").delete().eq("id", createdOrderId);
+      }
       toast.error("Une erreur est survenue.");
       return;
     } finally {
@@ -1316,7 +1396,8 @@ function AdminOrders() {
             <div className="grid gap-4 py-2">
               <div className="space-y-2">
                 <Label>Client</Label>
-                <Input value={draft.customer_name} onChange={(e) => setDraft({ ...draft, customer_name: e.target.value })} placeholder="Nom et prénom" />
+                <Input id="order-customer_name" value={draft.customer_name} onChange={(e) => { setDraft({ ...draft, customer_name: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_name: "" })); }} placeholder="Nom et prénom" aria-invalid={Boolean(orderFieldErrors.customer_name)} className={orderFieldErrors.customer_name ? "border-red-500 focus-visible:ring-red-500" : undefined} />
+                {orderFieldErrors.customer_name && <p className="text-sm text-red-600">{orderFieldErrors.customer_name}</p>}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1327,7 +1408,8 @@ function AdminOrders() {
 
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
-                  <Input value={draft.customer_phone} onChange={(e) => setDraft({ ...draft, customer_phone: e.target.value })} placeholder="+216 ..." />
+                  <Input id="order-customer_phone" value={draft.customer_phone} onChange={(e) => { setDraft({ ...draft, customer_phone: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_phone: "" })); }} placeholder="+216 ..." aria-invalid={Boolean(orderFieldErrors.customer_phone)} className={orderFieldErrors.customer_phone ? "border-red-500 focus-visible:ring-red-500" : undefined} />
+                  {orderFieldErrors.customer_phone && <p className="text-sm text-red-600">{orderFieldErrors.customer_phone}</p>}
                 </div>
               </div>
 
@@ -1336,15 +1418,19 @@ function AdminOrders() {
                   <Label>Gouvernorat</Label>
                   <div className="relative">
                     <Input
+                    id="order-governorate"
                       value={displayedGovernorateValue}
                       onFocus={() => setIsGovernorateMenuOpen(true)}
                       onBlur={() => window.setTimeout(() => setIsGovernorateMenuOpen(false), 120)}
                       onChange={(e) => {
                         setGovernorateSearch(e.target.value);
                         setDraft((d) => ({ ...d, governorate: "" }));
+                        setOrderFieldErrors((errors) => ({ ...errors, governorate: "" }));
                         setIsGovernorateMenuOpen(true);
                       }}
                       placeholder="Rechercher un gouvernorat…"
+                      aria-invalid={Boolean(orderFieldErrors.governorate)}
+                      className={orderFieldErrors.governorate ? "border-red-500 focus-visible:ring-red-500" : undefined}
                     />
                     {isGovernorateMenuOpen && (
                       <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-background shadow-md">
@@ -1371,6 +1457,7 @@ function AdminOrders() {
                       </div>
                     )}
                   </div>
+                  {orderFieldErrors.governorate && <p className="text-sm text-red-600">{orderFieldErrors.governorate}</p>}
                   {selectedShippingRate && (
                     <p className="text-xs text-muted-foreground">
                       Frais de livraison : {formatPrice(selectedShippingRate.price)}
@@ -1395,18 +1482,26 @@ function AdminOrders() {
                 <div className="space-y-2">
                   <Label>Adresse de livraison</Label>
                   <Input
+                    id="order-address_line"
                     value={draft.address_line}
-                    onChange={(e) => setDraft({ ...draft, address_line: e.target.value })}
+                    onChange={(e) => { setDraft({ ...draft, address_line: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, address_line: "" })); }}
                     placeholder="Rue, numéro, bâtiment..."
+                    aria-invalid={Boolean(orderFieldErrors.address_line)}
+                    className={orderFieldErrors.address_line ? "border-red-500 focus-visible:ring-red-500" : undefined}
                   />
+                  {orderFieldErrors.address_line && <p className="text-sm text-red-600">{orderFieldErrors.address_line}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Ville</Label>
                   <Input
+                    id="order-city"
                     value={draft.city}
-                    onChange={(e) => setDraft({ ...draft, city: e.target.value })}
+                    onChange={(e) => { setDraft({ ...draft, city: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, city: "" })); }}
                     placeholder="Ville"
+                    aria-invalid={Boolean(orderFieldErrors.city)}
+                    className={orderFieldErrors.city ? "border-red-500 focus-visible:ring-red-500" : undefined}
                   />
+                  {orderFieldErrors.city && <p className="text-sm text-red-600">{orderFieldErrors.city}</p>}
                 </div>
               </div>
 
@@ -1467,7 +1562,9 @@ function AdminOrders() {
                               className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition hover:bg-accent/10 ${selectedProductId === product.id ? "bg-accent/10 text-accent" : "text-foreground"}`}
                             >
                               <span className="truncate">{product.name}</span>
-                              <span className="shrink-0 text-xs text-muted-foreground">{product.sku || product.id}</span>
+                              {product.sku && (
+                                <span className="shrink-0 text-xs text-muted-foreground">{product.sku}</span>
+                              )}
                             </button>
                           ))
                         )}
@@ -1507,7 +1604,9 @@ function AdminOrders() {
                       )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{selectedProduct.name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedProduct.sku || selectedProduct.id} · {formatPrice(selectedProduct.price)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedProduct.sku ? `${selectedProduct.sku} · ` : ""}{formatPrice(selectedProduct.price)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1565,7 +1664,12 @@ function AdminOrders() {
                           )}
                           <div>
                             <p className="text-sm font-medium">{item.name}</p>
-                            <p className="text-xs text-muted-foreground">{item.variant_label ?? "SKU non défini"}</p>
+                            {item.variant_label && (
+                              <p className="text-xs text-muted-foreground">{item.variant_label}</p>
+                            )}
+                            {item.sku && (
+                              <p className="text-xs text-muted-foreground">SKU : {item.sku}</p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1639,7 +1743,12 @@ function AdminOrders() {
                             )}
                             <div className="min-w-0">
                               <p className="truncate font-medium">{item.name}</p>
-                              <p className="text-xs text-muted-foreground">{item.variant_label ?? ""}</p>
+                              {item.variant_label && (
+                                <p className="text-xs text-muted-foreground">{item.variant_label}</p>
+                              )}
+                              {item.sku && (
+                                <p className="text-xs text-muted-foreground">SKU : {item.sku}</p>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -1675,13 +1784,7 @@ function AdminOrders() {
               <>
                 <Button variant="outline" onClick={() => setAddOpen(false)}>Annuler</Button>
                 <Button variant="accent" onClick={() => {
-                  const customerName = draft.customer_name.trim();
-                  if (!customerName) {
-                    toast.error("Le nom du client est requis.");
-                    return;
-                  }
-                  if (!draft.governorate) {
-                    toast.error("Sélectionne un gouvernorat dans la liste.");
+                  if (!validateOrderAddress()) {
                     return;
                   }
                   setCreateStep(2);
@@ -1821,6 +1924,7 @@ function AdminOrders() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{item.name}</p>
                       {item.variant_label && <p className="text-xs text-muted-foreground">{item.variant_label}</p>}
+                      {item.sku && <p className="text-xs text-muted-foreground">SKU : {item.sku}</p>}
                     </div>
                     <span className="text-sm text-muted-foreground">×{item.quantity}</span>
                     <span className="text-sm font-semibold">{formatPrice(item.unit_price * item.quantity)}</span>

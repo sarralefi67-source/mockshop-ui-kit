@@ -44,7 +44,7 @@ function PromotionsPage() {
         <div className="container-page py-10">
           <h1 className="page-title text-3xl">Promotions</h1>
           <p className="mt-2 text-muted-foreground">
-            {promos.length} produits en réduction — offres limitées dans le temps.
+            {promos.length} produits en réduction 
           </p>
         </div>
       </div>

@@ -818,7 +818,7 @@ function AdminProducts() {
         </div>
       </div>
 
-      <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-card">
+      <div className="max-h-[100vh] overflow-auto rounded-xl border border-border bg-card">
         <Table className="min-w-[900px]">
           <TableHeader className="sticky top-0 z-10 bg-card">
             <TableRow>
@@ -1123,7 +1123,7 @@ function AdminProducts() {
                   <div className="text-muted-foreground">
                     <span className="font-bold text-foreground">SKU :</span> {viewProduct.sku || "—"}
                   </div>
-                  {hasOneGlobalPrice && (
+                  {hasVariants && hasOneGlobalPrice && (
                     <div className="my-3 pt-1">
                       <div className="font-bold text-foreground">Prix global :</div>
                       <div className="mt-3 flex items-baseline gap-2 font-semibold">
