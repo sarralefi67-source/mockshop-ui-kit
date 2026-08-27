@@ -84,7 +84,7 @@ function HomePage() {
     <StoreLayout>
       {/* Hero */}
       {banners.length > 0 && (
-        <section className="border-b border-surface bg-surface ">
+        <section className="mx-6 mt-6 overflow-hidden sm:mx-16">
           <Carousel setApi={setCarouselApi} opts={{ loop: true }}>
             <CarouselContent>
               {banners.map((banner) => {
@@ -163,11 +163,11 @@ function HomePage() {
 
       {/* Promos */}
       {(loading || promos.length > 0) && (
-        <section className="border-y border-border/60 bg-surface py-14">
+        <section className="py-14">
           <div className="container-page">
             <div className="flex items-end justify-between">
               <div>
-                <h2 className="page-title text-2xl">En promotion</h2>
+                <h2 className="section-title">En promotion</h2>
                 {/* <p className="text-sm text-muted-foreground">Offres valables jusqu'à fin du mois.</p> */}
               </div>
               <Link to="/promotions" className="shrink-0 text-sm font-semibold text-accent-strong hover:underline">
@@ -185,8 +185,8 @@ function HomePage() {
 
       {/* Nouveautés */}
       {!loading && nouveautes.length > 0 && (
-        <section className="container-page py-14">
-          <h2 className="section-title">Nouveautés</h2>
+        <section className="container-page py-8">
+          <h2 className="page-title text-2xl">Nouveautés</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {nouveautes.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
@@ -195,7 +195,7 @@ function HomePage() {
 
       {/* Tous les produits */}
       {(loading || products.length > 0) && (
-        <section className="border-t border-border/60 py-14">
+        <section className=" border-border/60 py-8">
           <div className="container-page">
             <h2 className="section-title">Tous nos produits</h2>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
