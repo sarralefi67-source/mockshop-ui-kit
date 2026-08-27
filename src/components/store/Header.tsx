@@ -45,6 +45,7 @@ export function Header() {
   const { user, profile, signOut, openAuth } = useAuth();
   const { settings } = useSiteSettings();
   const [query, setQuery] = useState("");
+  const [searchReady, setSearchReady] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const [tree, setTree] = useState<CategoryNode[]>([]);
@@ -63,6 +64,11 @@ export function Header() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    setQuery("");
+    setSearchReady(false);
+  }, [user?.id]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,6 +141,11 @@ export function Header() {
 
           <div className="relative mx-auto hidden w-full max-w-xl lg:block">
             <Input
+              name="search"
+              autoComplete="off"
+              readOnly={!searchReady}
+              onFocus={() => setSearchReady(true)}
+              data-lpignore="true"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher un produit, une marque…"
@@ -229,6 +240,11 @@ export function Header() {
         <div className="container-page pb-3 lg:hidden">
           <div className="relative">
             <Input
+              name="search"
+              autoComplete="off"
+              readOnly={!searchReady}
+              onFocus={() => setSearchReady(true)}
+              data-lpignore="true"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Rechercher…"

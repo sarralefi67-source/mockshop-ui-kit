@@ -56,6 +56,7 @@ type DraftOrderItem = {
   product_id: string | null;
   variant_id: string | null;
   name: string;
+  sku: string | null;
   variant_label: string | null;
   image: string | null;
   unit_price: number;
@@ -142,6 +143,7 @@ async function fetchOrders(): Promise<Order[]> {
       order_items(
         *,
         products(
+          sku,
           product_images(url, is_main, position)
         )
       )
@@ -208,6 +210,7 @@ function mapOrderRow(r: any): Order {
         product_id: it.product_id,
         variant_id: it.variant_id,
         name: it.product_name || it.product_id || "Article",
+        sku: it.sku || it.products?.sku || null,
         variant_label: it.variant_label || null,
         image: mainImage,
         unit_price: it.unit_price ?? 0,
@@ -223,6 +226,8 @@ function AdminOrders() {
   const { settings } = useSiteSettings();
   const [list, setList] = useState<Order[]>([]);
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [detail, setDetail] = useState<Order | null>(null);
   const { order: focusOrderId, ref: focusOrderRef } = Route.useSearch();
@@ -244,6 +249,7 @@ function AdminOrders() {
   const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+  const [dateSortDir, setDateSortDir] = useState<'asc' | 'desc' | null>(null);
   const [governorateSearch, setGovernorateSearch] = useState("");
   const [isGovernorateMenuOpen, setIsGovernorateMenuOpen] = useState(false);
   const [draft, setDraft] = useState<ReturnType<typeof emptyOrderDraft>>(emptyOrderDraft());
@@ -418,14 +424,25 @@ function AdminOrders() {
       o.reference.toLowerCase().includes(q) ||
       o.customer_name.toLowerCase().includes(q) ||
       (o.governorate || "").toLowerCase().includes(q);
+    const orderDate = o.created_at?.slice(0, 10) ?? "";
+    const matchDate = (!dateFrom || orderDate >= dateFrom) && (!dateTo || orderDate <= dateTo);
     const matchStatus = filter === "all" || o.status === filter;
-    return matchSearch && matchStatus;
+    return matchSearch && matchDate && matchStatus;
   });
 
-  // Apply sorting (currently only supports sorting by total)
+  // Apply the selected sort to the filtered orders.
   const sorted = (() => {
-    if (!sortDir) return filtered;
-    return [...filtered].sort((a, b) => (sortDir === "asc" ? a.total - b.total : b.total - a.total));
+    if (sortDir) {
+      return [...filtered].sort((a, b) => (sortDir === "asc" ? a.total - b.total : b.total - a.total));
+    }
+    if (dateSortDir) {
+      return [...filtered].sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateSortDir === "asc" ? dateA - dateB : dateB - dateA;
+      });
+    }
+    return filtered;
   })();
 
   // Pagination (client-side)
@@ -556,7 +573,12 @@ function AdminOrders() {
     doc.setFont("helvetica", "bold");
     doc.text(`Commande : ${order.reference}`, 14, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`Date : ${order.created_at ? new Date(order.created_at).toLocaleDateString("fr-FR") : "-"}`, pageWidth - 14, y, { align: "right" });
+    doc.text(
+      `Date : ${order.created_at ? `${new Date(order.created_at).toLocaleDateString("fr-FR")} à ${new Date(order.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : "-"}`,
+      pageWidth - 14,
+      y,
+      { align: "right" },
+    );
     y += 9;
     doc.text(`Statut : ${(ORDER_STATUS_LABELS as any)[order.status] ?? order.status}`, 14, y);
     y += 14;
@@ -579,6 +601,16 @@ function AdminOrders() {
     });
     y += 8;
 
+    if (order.notes) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Note", 14, y);
+      doc.setFont("helvetica", "normal");
+      y += 6;
+      const noteLines = doc.splitTextToSize(order.notes, pageWidth - 28);
+      doc.text(noteLines, 14, y);
+      y += noteLines.length * 5 + 8;
+    }
+
     doc.setFont("helvetica", "bold");
     doc.text("Articles", 14, y);
     y += 7;
@@ -597,7 +629,11 @@ function AdminOrders() {
         doc.addPage();
         y = 20;
       }
-      const nameLines = doc.splitTextToSize(`${item.name}${item.variant_label ? ` - ${item.variant_label}` : ""}`, 100);
+      const itemLabel = `${item.name}${item.variant_label ? ` - ${item.variant_label}` : ""}`;
+      const nameLines = doc.splitTextToSize(
+        `${itemLabel}\nSKU : ${item.sku || "Non défini"}`,
+        100,
+      );
       doc.text(nameLines, 14, y);
       doc.text(String(item.quantity), 125, y);
       doc.text(formatPrice(item.unit_price), 145, y);
@@ -649,6 +685,7 @@ function AdminOrders() {
       product_id: it.product_id,
       variant_id: it.variant_id ?? null,
       name: it.name,
+      sku: it.sku ?? null,
       variant_label: it.variant_label ?? null,
       image: it.image ?? null,
       unit_price: it.unit_price ?? 0,
@@ -701,6 +738,7 @@ function AdminOrders() {
           product_id: product.id,
           variant_id: variant?.id ?? null,
           name: product.name,
+          sku,
           variant_label: variantLabel,
           image,
           unit_price: price,
@@ -846,7 +884,7 @@ function AdminOrders() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         total: item.unit_price * item.quantity,
-        sku: item.variant_id ?? item.product_id,
+        sku: item.sku,
       }));
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItemsPayload);
@@ -905,7 +943,7 @@ function AdminOrders() {
         quantity: item.quantity,
         unit_price: item.unit_price,
         total: item.unit_price * item.quantity,
-        sku: item.variant_id ?? item.product_id,
+        sku: item.sku,
       }));
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItemsPayload);
@@ -947,6 +985,7 @@ function AdminOrders() {
         product_id: item.product_id,
         variant_id: item.variant_id,
         name: item.name,
+        sku: item.sku,
         variant_label: item.variant_label,
         image: item.image,
         unit_price: item.unit_price,
@@ -1030,17 +1069,30 @@ function AdminOrders() {
         </div>
 
         <div className="mt-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Réf., client ou gouvernorat…" className="w-80 sm:w-96" />
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                {statuses.map((s) => (
-                  <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Réf., client ou gouvernorat…" className="w-80 sm:w-96" />
+              <Select value={filter} onValueChange={(value) => { setFilter(value); setPage(1); }}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  {statuses.map((s) => (
+                    <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Filtrer par date :</span>
+              <label className="flex items-center gap-1">
+                <span className="text-muted-foreground">Du</span>
+                <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="h-9 rounded-md border border-border bg-card px-2 outline-none focus:border-accent-strong" />
+              </label>
+              <label className="flex items-center gap-1">
+                <span className="text-muted-foreground">Au</span>
+                <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="h-9 rounded-md border border-border bg-card px-2 outline-none focus:border-accent-strong" />
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -1078,7 +1130,11 @@ function AdminOrders() {
               <TableHead>
                 <button
                   type="button"
-                  onClick={() => { setSortDir((s) => (s === "asc" ? "desc" : "asc")); setPage(1); }}
+                  onClick={() => {
+                    setSortDir((s) => (s === "asc" ? "desc" : "asc"));
+                    setDateSortDir(null);
+                    setPage(1);
+                  }}
                   className="inline-flex items-center gap-2"
                 >
                   <span>Total</span>
@@ -1086,7 +1142,20 @@ function AdminOrders() {
                 </button>
               </TableHead>
               <TableHead>Statut</TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateSortDir((current) => (current === "asc" ? "desc" : "asc"));
+                    setSortDir(null);
+                    setPage(1);
+                  }}
+                  className="inline-flex items-center gap-2"
+                >
+                  <span>Date</span>
+                  <SortArrow dir={dateSortDir} ariaLabel="Trier par date" />
+                </button>
+              </TableHead>
               <TableHead className="text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1702,6 +1771,9 @@ function AdminOrders() {
           </DialogHeader>
           {detail && (
             <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Passée le : {detail.created_at ? new Date(detail.created_at).toLocaleString("fr-FR") : "Date non renseignée"}
+              </p>
               <div className="flex items-center justify-between">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
@@ -1770,18 +1842,32 @@ function AdminOrders() {
           )}
         <DialogFooter className="sticky bottom-0 left-0 right-0 z-10 -mx-6 -mb-4 border-t border-border bg-background px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {detail && (
-            <div className="w-full">
-              <p className="text-sm font-medium mb-2">Changer le statut</p>
-              <Select value={detail.status} onValueChange={(v) => changeStatus(detail.id, v as OrderStatus)}>
-                <SelectTrigger className="w-full h-8"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {statuses
-                    .filter((s) => s === detail.status || (allowedTransitions[detail.status] || []).includes(s))
-                    .map((s) => (
-                      <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+            <div className="flex w-full items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="mb-2 text-sm font-medium">Changer le statut</p>
+                <Select value={detail.status} onValueChange={(v) => changeStatus(detail.id, v as OrderStatus)}>
+                  <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {statuses
+                      .filter((s) => s === detail.status || (allowedTransitions[detail.status] || []).includes(s))
+                      .map((s) => (
+                        <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  openEdit(detail);
+                  setDetail(null);
+                }}
+                aria-label="Modifier la commande"
+              >
+                <Edit2 className="h-4 w-4" />
+                Modifier
+              </Button>
             </div>
           )}
         </DialogFooter>

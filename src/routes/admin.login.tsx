@@ -22,6 +22,8 @@ function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   async function handleForgotPassword() {
     const address = email.trim();
@@ -57,12 +59,21 @@ function AdminLogin() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const cleanEmail = email.trim();
+    setEmailError(cleanEmail ? "" : "L'adresse e-mail est obligatoire.");
+    setPasswordError(password ? "" : "Le mot de passe est obligatoire.");
+    if (!cleanEmail || !password) {
+      document.getElementById(!cleanEmail ? "admin-email" : "admin-password")?.focus();
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await signIn(email, password);
       if (error) {
         console.error("admin signIn error:", error);
-        toast.error(error.message ?? "Erreur d'authentification");
+        setPasswordError("Adresse e-mail ou mot de passe incorrect.");
+        document.getElementById("admin-password")?.focus();
         setLoading(false);
         return;
       }
@@ -102,17 +113,28 @@ function AdminLogin() {
           <p className="text-sm text-muted-foreground mt-1">
             Veuillez vous connecter avec un compte administrateur.
           </p>
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <Label>Adresse e-mail</Label>
+          <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="admin-email">Adresse e-mail</Label>
               <Input
+                id="admin-email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError("");
+                }}
                 type="email"
-                required
+                aria-invalid={Boolean(emailError)}
+                aria-describedby={emailError ? "admin-email-error" : undefined}
+                className={emailError ? "border-red-600 focus-visible:ring-red-600" : undefined}
               />
+              {emailError ? (
+                <p id="admin-email-error" className="text-sm text-red-600" role="alert">
+                  {emailError}
+                </p>
+              ) : null}
             </div>
-            <div>
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="admin-password">Mot de passe</Label>
                 <button
@@ -128,10 +150,14 @@ function AdminLogin() {
                 <Input
                   id="admin-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError("");
+                  }}
                   type={passwordVisible ? "text" : "password"}
-                  required
-                  className="pr-11"
+                  aria-invalid={Boolean(passwordError)}
+                  aria-describedby={passwordError ? "admin-password-error" : undefined}
+                  className={`${passwordError ? "border-red-600 focus-visible:ring-red-600 " : ""}pr-11`}
                 />
                 <button
                   type="button"
@@ -144,6 +170,11 @@ function AdminLogin() {
                   {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {passwordError ? (
+                <p id="admin-password-error" className="text-sm text-red-600" role="alert">
+                  {passwordError}
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center justify-between">
               <Button type="submit" variant="accent" disabled={loading}>

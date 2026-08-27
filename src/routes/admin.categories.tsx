@@ -1215,9 +1215,7 @@ function AdminCategories() {
 
       setFile(null);
 
-      toast.success(
-        "Image supprimée."
-      );
+    
 
     } catch (err) {
 

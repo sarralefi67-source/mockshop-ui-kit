@@ -19,6 +19,8 @@ begin
       select
         products.id,
         products.name,
+        products.slug,
+        products.sku,
         products.stock_quantity,
         (
           select product_images.url

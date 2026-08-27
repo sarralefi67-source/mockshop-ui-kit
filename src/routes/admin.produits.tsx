@@ -60,6 +60,13 @@ const emptyProduct: Product = {
   images: [], attributes: [], variants: [], tags: [],
 };
 
+function applyPromotion(price: number, promotion?: { discount_type: string | null; discount_value: number }) {
+  if (!promotion) return null;
+  if (promotion.discount_type === "percentage") return Math.max(0, price * (1 - promotion.discount_value / 100));
+  if (promotion.discount_type === "fixed") return Math.max(0, price - promotion.discount_value);
+  return null;
+}
+
 function AdminProducts() {
   const [list, setList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
@@ -99,7 +106,12 @@ function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
 
   // client-side filtering + sorting
-  let filtered = list.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.brand.toLowerCase().includes(search.toLowerCase()));
+  let filtered = list.filter((p) => {
+    const query = search.toLowerCase();
+    return p.name.toLowerCase().includes(query)
+      || p.brand.toLowerCase().includes(query)
+      || p.sku.toLowerCase().includes(query);
+  });
   // apply stock filter
   filtered = filtered.filter((p) => {
     if (stockFilter === "all") return true;
@@ -344,12 +356,41 @@ function AdminProducts() {
     try {
       // ---- 1) produit ----
       let productId = draft.id;
+      let activePromotions: Array<{
+        variant_id: string | null;
+        discount_type: string | null;
+        discount_value: number;
+        starts_at: string | null;
+        ends_at: string | null;
+      }> = [];
+      if (productId) {
+        const { data: promotionRows, error: promotionError } = await supabase
+          .from("promotions")
+          .select("variant_id,discount_type,discount_value,starts_at,ends_at")
+          .eq("product_id", productId)
+          .eq("is_active", true);
+        if (promotionError) throw promotionError;
+        const now = Date.now();
+        activePromotions = (promotionRows ?? []).filter((promotion: any) => {
+          const startsAt = promotion.starts_at ? new Date(promotion.starts_at).getTime() : -Infinity;
+          const endsAt = promotion.ends_at ? new Date(promotion.ends_at).getTime() : Infinity;
+          return startsAt <= now && endsAt >= now;
+        }).map((promotion: any) => ({
+          variant_id: promotion.variant_id ?? null,
+          discount_type: promotion.discount_type ?? null,
+          discount_value: Number(promotion.discount_value ?? 0),
+          starts_at: promotion.starts_at ?? null,
+          ends_at: promotion.ends_at ?? null,
+        }));
+      }
       const computedGlobalStock = draft.variants.length > 0
         ? draft.variants.reduce((sum, v) => sum + Number(v.stock ?? 0), 0)
         : Number(draft.stock ?? 0);
       const computedBasePrice = draft.variants.length > 0
         ? draft.variants.reduce((min, v) => Math.min(min, Number(v.price ?? 0)), Number(draft.price ?? 0))
         : Number(draft.price ?? 0);
+      const globalPromotion = activePromotions.find((promotion) => promotion.variant_id === null);
+      const globalSellPrice = applyPromotion(computedBasePrice, globalPromotion);
       const productPayload = {
         name: draft.name,
         slug,
@@ -358,6 +399,7 @@ function AdminProducts() {
         short_description: draft.short_description.trim(),
         description: draft.description || null,
         base_price: computedBasePrice,
+        cost_price: globalSellPrice != null && globalSellPrice < computedBasePrice ? globalSellPrice : null,
         sku: draft.sku || `SKU-${Date.now()}`,
         has_variants: draft.variants.length > 0,
         stock_quantity: computedGlobalStock,
@@ -494,6 +536,13 @@ function AdminProducts() {
           // unique par défaut plutôt que de laisser Postgres rejeter silencieusement la ligne.
           sku: v.sku?.trim() || null,
           price: v.price ?? 0,
+          cost_price: (() => {
+            const promotion = activePromotions.find(
+              (item) => item.variant_id === v.id || item.variant_id === null,
+            );
+            const sellPrice = applyPromotion(Number(v.price ?? 0), promotion);
+            return sellPrice != null && sellPrice < Number(v.price ?? 0) ? sellPrice : null;
+          })(),
           compare_at_price: v.compare_at_price ?? null,
           stock_quantity: v.stock ?? 0,
           is_active: v.is_active ?? true,
@@ -1075,10 +1124,10 @@ function AdminProducts() {
                     <span className="font-bold text-foreground">SKU :</span> {viewProduct.sku || "—"}
                   </div>
                   {hasOneGlobalPrice && (
-                    <div className="mb-3 pt-1">
+                    <div className="my-3 pt-1">
                       <div className="font-bold text-foreground">Prix global :</div>
-                      <div className="flex items-baseline gap-2 font-semibold">
-                        <span className="text-xl pt-2">{formatPrice(globalPromoPrice)}</span>
+                      <div className="mt-3 flex items-baseline gap-2 font-semibold">
+                        <span className="text-xl">{formatPrice(globalPromoPrice)}</span>
                         {globalDiscountPercent !== null && (
                           <span className="text-md text-muted-foreground line-through">{formatPrice(globalOriginalPrice)}</span>
                         )}
@@ -1088,7 +1137,7 @@ function AdminProducts() {
                           </span>
                         )}
                       </div>
-                      <div className={viewProduct.stock === 0 ? "mt-1 font-semibold text-destructive" : "mt-1 text-muted-foreground"}>
+                      <div className={viewProduct.stock === 0 ? "mt-3 font-semibold text-destructive" : "mt-3 text-muted-foreground"}>
                         <span className="font-bold text-foreground">Stock global :</span> {viewProduct.stock}
                       </div>
                     </div>
@@ -1208,7 +1257,7 @@ function AdminProducts() {
                             );
                           })}
                         </div>
-                        <div className="flex items-baseline gap-2 font-semibold">
+                        <div className="mt-5 flex items-baseline gap-2 font-semibold">
                           <span className="text-lg">{formatPrice(selectedVariant.cost_price ?? selectedVariant.price)}</span>
                           {selectedVariant.cost_price != null && selectedVariant.cost_price !== selectedVariant.price && (
                             <>

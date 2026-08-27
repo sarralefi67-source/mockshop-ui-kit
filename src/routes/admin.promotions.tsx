@@ -93,6 +93,7 @@ function AdminPromotions() {
   const [promoStatusConfirm, setPromoStatusConfirm] = useState<PromoRow | null>(null);
   const [isUpdatingPromoStatus, setIsUpdatingPromoStatus] = useState(false);
   const [promoSearch, setPromoSearch] = useState("");
+  const [promoProductSearch, setPromoProductSearch] = useState("");
   const [promoStatusFilter, setPromoStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [promoDateFilter, setPromoDateFilter] = useState<"all" | "current" | "upcoming" | "ended" | "undated">("all");
   const [promoSort, setPromoSort] = useState<"asc" | "desc" | null>(null);
@@ -106,6 +107,15 @@ function AdminPromotions() {
   const promoValueRef = useRef<HTMLInputElement>(null);
   const promoProductRef = useRef<HTMLButtonElement>(null);
   const promoPageSize = 10;
+
+  const filteredPromoProducts = productsList
+    .filter((product) => {
+      const query = promoProductSearch.trim().toLowerCase();
+      return !query
+        || product.name.toLowerCase().includes(query)
+        || (product.sku ?? "").toLowerCase().includes(query);
+    })
+    .slice(0, 20);
 
   useEffect(() => {
     let mounted = true;
@@ -601,7 +611,7 @@ function AdminPromotions() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="accent" onClick={() => { setPromoDraft(emptyPromo); setPromoValidation({}); }}>
+            <Button variant="accent" onClick={() => { setPromoDraft(emptyPromo); setPromoProductSearch(""); setPromoValidation({}); }}>
               <Plus className="h-4 w-4" /> Nouvelle promotion
             </Button>
           </div>
@@ -711,6 +721,7 @@ function AdminPromotions() {
                       <TableCell className="text-right">
                         <button aria-label="Modifier" className="mr-1 rounded p-1.5 text-foreground hover:bg-surface" onClick={() => {
                           setPromoDraft(isGlobalPromo(p) ? { ...p, product_id: ALL_PRODUCTS_VALUE } : p);
+                          setPromoProductSearch("");
                           setPromoValidation({});
                         }}>
                           <Pencil className="h-4 w-4" />
@@ -1001,8 +1012,17 @@ function AdminPromotions() {
                     <SelectValue placeholder="Sélectionner un produit" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="p-2" onKeyDown={(event) => event.stopPropagation()}>
+                      <Input
+                        value={promoProductSearch}
+                        onChange={(event) => setPromoProductSearch(event.target.value)}
+                        placeholder="Rechercher par nom ou SKU..."
+                        aria-label="Rechercher un produit"
+                        autoFocus
+                      />
+                    </div>
                     <SelectItem value={ALL_PRODUCTS_VALUE}>Tous les produits</SelectItem>
-                    {productsList.map((p) => (
+                    {filteredPromoProducts.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.sku ?? p.name}</SelectItem>
                     ))}
                   </SelectContent>

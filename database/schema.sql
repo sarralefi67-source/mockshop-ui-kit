@@ -13,6 +13,7 @@ create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   first_name text,
   last_name text,
+  email text,
   phone text,
   role text not null default 'customer' check (role in ('customer', 'admin')),
   newsletter_opt_in boolean default false,

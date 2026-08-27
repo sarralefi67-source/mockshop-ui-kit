@@ -1131,6 +1131,7 @@ export type OrderItem = {
   product_id: string | null
   variant_id: string | null
   name: string
+  sku?: string | null
   variant_label: string | null
   image: string | null
   unit_price: number

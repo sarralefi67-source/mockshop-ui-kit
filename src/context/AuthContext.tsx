@@ -112,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     options: {
       ...(attrs ? { data: attrs } : {}),
       ...(captchaToken ? { captchaToken } : {}),
+      emailRedirectTo: `${window.location.origin}/compte`,
     },
   });
 

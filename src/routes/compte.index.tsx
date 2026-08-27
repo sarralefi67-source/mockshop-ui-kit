@@ -7,22 +7,82 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Eye, EyeOff } from "lucide-react";
+
+const MIN_PASSWORD_LENGTH = 6;
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  error,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+  error?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={visible ? "text" : "password"}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={`${error ? "border-red-600 focus-visible:ring-red-600 " : ""}pr-11`}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((current) => !current)}
+          aria-label={visible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+          className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded text-muted-foreground hover:text-foreground"
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+      {error ? (
+        <p id={`${id}-error`} className="text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/compte/")({
   component: AccountInfo,
 });
 
 function AccountInfo() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [newsletter, setNewsletter] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
+  const [passwordStep, setPasswordStep] = useState<1 | 2>(1);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<{
+    current?: string;
+    new?: string;
+    confirm?: string;
+  }>({});
 
   useEffect(() => {
     if (!profile) return;
@@ -82,7 +142,17 @@ function AccountInfo() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="em">E-mail</Label>
-            <Input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="em"
+              type="email"
+              value={email}
+              readOnly
+              disabled
+              aria-describedby="email-locked"
+            />
+            <p id="email-locked" className="text-xs text-muted-foreground">
+              L'adresse e-mail ne peut pas être modifiée.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="ph">Téléphone</Label>
@@ -90,60 +160,163 @@ function AccountInfo() {
           </div>
         </div>
 
-        <div className="mt-5 flex items-start gap-2">
-          <Checkbox id="nl" checked={newsletter} onCheckedChange={(v) => setNewsletter(Boolean(v))} />
-          <Label htmlFor="nl" className="text-sm font-normal leading-snug">
-            Je souhaite recevoir la newsletter (promotions et nouveautés, 1 e-mail par semaine).
-          </Label>
-        </div>
+     
 
         <Button variant="accent" type="submit" className="mt-6" disabled={saving || !profile}>
           {saving ? "Enregistrement…" : "Enregistrer"}
         </Button>
       </form>
 
-      <form
+      <div
         className="rounded-xl border border-border bg-card p-6"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (pw1.length < 6) {
-            toast.error("Le mot de passe doit contenir au moins 6 caractères.");
-            return;
-          }
-          if (pw1 !== pw2) {
-            toast.error("Les mots de passe ne correspondent pas.");
-            return;
-          }
-          setChangingPassword(true);
-          try {
-            const { error } = await supabase.auth.updateUser({ password: pw1 });
-            if (error) throw error;
-            setPw1("");
-            setPw2("");
-            toast.success("Mot de passe mis à jour.");
-          } catch (err: any) {
-            console.error("update password error:", err);
-            toast.error(err?.message ?? "Impossible de mettre à jour le mot de passe.");
-          } finally {
-            setChangingPassword(false);
-          }
-        }}
       >
         <h2 className="text-lg font-bold">Mot de passe</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="pw1">Nouveau mot de passe</Label>
-            <Input id="pw1" type="password" placeholder="••••••••" value={pw1} onChange={(e) => setPw1(e.target.value)} />
+        <ol className="mt-4 flex items-center justify-center gap-3 text-sm">
+          <li className={passwordStep === 1 ? "font-semibold" : "text-muted-foreground"}>1. Mot de passe actuel</li>
+          <li className="text-muted-foreground">→</li>
+          <li className={passwordStep === 2 ? "font-semibold" : "text-muted-foreground"}>2. Nouveau mot de passe</li>
+        </ol>
+
+        {passwordStep === 1 ? (
+          <div className="mx-auto mt-5 max-w-md space-y-4">
+            <PasswordField
+              id="current-password"
+              label="Mot de passe actuel"
+              value={currentPassword}
+              onChange={(value) => {
+                setCurrentPassword(value);
+                if (passwordErrors.current) setPasswordErrors((errors) => ({ ...errors, current: undefined }));
+              }}
+              autoComplete="current-password"
+              error={passwordErrors.current}
+            />
+            <div className="flex justify-end">
+              <Button
+                variant="accent"
+                type="button"
+                onClick={async () => {
+                if (!currentPassword) {
+                  setPasswordErrors({ current: "Saisissez votre mot de passe actuel." });
+                  document.getElementById("current-password")?.focus();
+                  return;
+                }
+                if (!user?.email) {
+                  toast.error("Session expirée, reconnectez-vous.");
+                  return;
+                }
+                setVerifyingPassword(true);
+                try {
+                  const { error } = await supabase.auth.signInWithPassword({
+                    email: user.email,
+                    password: currentPassword,
+                  });
+                  if (error) {
+                    setPasswordErrors({ current: "Mot de passe actuel incorrect." });
+                    document.getElementById("current-password")?.focus();
+                    return;
+                  }
+                  setPasswordErrors({});
+                  setPasswordStep(2);
+                } catch (error) {
+                  console.error("verify current password error:", error);
+                  toast.error("Vérification impossible pour le moment.");
+                } finally {
+                  setVerifyingPassword(false);
+                }
+                }}
+                disabled={verifyingPassword || !currentPassword}
+              >
+                {verifyingPassword ? "Vérification…" : "Suivant"}
+              </Button>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="pw2">Confirmation</Label>
-            <Input id="pw2" type="password" placeholder="••••••••" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        ) : (
+          <div className="mx-auto mt-5 max-w-md space-y-4">
+            <PasswordField
+              id="new-password"
+              label="Nouveau mot de passe"
+              value={newPassword}
+              onChange={(value) => {
+                setNewPassword(value);
+                if (passwordErrors.new) setPasswordErrors((errors) => ({ ...errors, new: undefined }));
+              }}
+              autoComplete="new-password"
+              error={passwordErrors.new}
+            />
+            <PasswordField
+              id="confirm-password"
+              label="Confirmer le nouveau mot de passe"
+              value={confirmPassword}
+              onChange={(value) => {
+                setConfirmPassword(value);
+                if (passwordErrors.confirm) setPasswordErrors((errors) => ({ ...errors, confirm: undefined }));
+              }}
+              autoComplete="new-password"
+              error={passwordErrors.confirm}
+            />
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li className={newPassword.length >= MIN_PASSWORD_LENGTH ? "text-emerald-600" : undefined}>
+                Au moins {MIN_PASSWORD_LENGTH} caractères
+              </li>
+              <li
+                className={
+                  newPassword.length > 0 && newPassword !== currentPassword ? "text-emerald-600" : undefined
+                }
+              >
+                Différent de l'ancien mot de passe
+              </li>
+              <li className={newPassword === confirmPassword && newPassword.length > 0 ? "text-emerald-600" : undefined}>
+                Les deux saisies sont identiques
+              </li>
+            </ul>
+            <div className="flex justify-between gap-3">
+              <Button type="button" variant="ghost" onClick={() => setPasswordStep(1)} disabled={changingPassword}>
+                Retour
+              </Button>
+              <Button
+                variant="accent"
+                type="button"
+                onClick={async () => {
+                  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+                    setPasswordErrors({ new: `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères.` });
+                    document.getElementById("new-password")?.focus();
+                    return;
+                  }
+                  if (newPassword === currentPassword) {
+                    setPasswordErrors({ new: "Le nouveau mot de passe doit être différent de l'ancien." });
+                    document.getElementById("new-password")?.focus();
+                    return;
+                  }
+                  if (newPassword !== confirmPassword) {
+                    setPasswordErrors({ confirm: "Les mots de passe ne correspondent pas." });
+                    document.getElementById("confirm-password")?.focus();
+                    return;
+                  }
+                  setChangingPassword(true);
+                  try {
+                    const { error } = await supabase.auth.updateUser({ password: newPassword });
+                    if (error) throw error;
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setPasswordStep(1);
+                    setPasswordErrors({});
+                    toast.success("Mot de passe mis à jour.");
+                  } catch (error) {
+                    console.error("update password error:", error);
+                    toast.error("Impossible de mettre à jour le mot de passe.");
+                  } finally {
+                    setChangingPassword(false);
+                  }
+                }}
+                disabled={changingPassword}
+              >
+                {changingPassword ? "Mise à jour…" : "Modifier le mot de passe"}
+              </Button>
+            </div>
           </div>
-        </div>
-        <Button variant="outline" type="submit" className="mt-5" disabled={changingPassword}>
-          {changingPassword ? "Mise à jour…" : "Mettre à jour"}
-        </Button>
-      </form>
+        )}
+      </div>
     </div>
   );
 }

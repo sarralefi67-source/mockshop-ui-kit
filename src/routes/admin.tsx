@@ -14,7 +14,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Administration : Artisanat" },
+      { title: "Administration :  Artisanat" },
       { name: "description", content: "Administration Artisanat : catalogue, promotions et commandes." },
       { property: "og:title", content: "Administration : Artisanat" },
       { property: "og:description", content: "Interface d'administration de la boutique Artisanat." },

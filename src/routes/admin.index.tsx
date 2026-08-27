@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
 
 type MonthlySale = { month: string; total: number };
-type LowStockProduct = { id: string; name: string; stock_quantity: number; image_url: string | null };
+type LowStockProduct = { id: string; name: string; sku: string | null; stock_quantity: number; image_url: string | null };
 type RecentOrder = { id: string; reference: string; status: string; total: number; created_at: string | null; customer_name: string; governorate: string | null };
 type Kpis = {
   customers: number;
@@ -36,6 +36,16 @@ const daysAgo = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() - days);
   return date.toISOString().slice(0, 10);
+};
+
+const formatOrderDate = (value: string | null) => {
+  if (!value) return "Date non renseignée";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date non renseignée";
+  return `${date.toLocaleDateString("fr-FR")} à ${date.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 };
 
 function AdminDashboard() {
@@ -165,13 +175,13 @@ function AdminDashboard() {
     <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
       <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-base font-bold">Ventes par mois</h2><div className="mt-4 h-64">
         {salesLoading ? <div className="flex h-full items-center justify-center"><Spinner className="h-6 w-6" /></div> : <ResponsiveContainer width="100%" height="100%"><LineChart data={salesByMonth}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} /><YAxis tickLine={false} axisLine={false} fontSize={12} width={50} /><Tooltip cursor={{ fill: "var(--surface)" }} contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)" }} /><Line type="monotone" dataKey="total" stroke="var(--accent-strong)" strokeWidth={3} dot={{ r: 4, fill: "var(--accent-strong)" }} activeDot={{ r: 6 }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} /><YAxis tickLine={false} axisLine={false} fontSize={12} width={50} /><Tooltip cursor={{ fill: "var(--surface)" }} contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--card)" }} formatter={(value) => formatPrice(Number(value))} /><Line type="monotone" dataKey="total" stroke="var(--accent-strong)" strokeWidth={3} dot={{ r: 4, fill: "var(--accent-strong)" }} activeDot={{ r: 6 }} />
         </LineChart></ResponsiveContainer>}
       </div></div>
       <div className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-base font-bold">Stock faible</h2>{listsLoading ? 
-        <Spinner className="mt-4 h-6 w-6" /> : lowStock.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Tous les stocks sont confortables.</p> : <ul className="mt-4 space-y-3">{lowStock.map((product) => <li key={product.id} className="flex items-center gap-3"><img src={product.image_url ?? ""} alt="" className="h-10 w-10 rounded-md object-cover" /><span className="min-w-0 flex-1 truncate text-sm">{product.name}</span><span className={product.stock_quantity === 0 ? "text-sm font-bold text-destructive" : "text-sm font-bold text-warning"}>{product.stock_quantity}</span></li>)}</ul>}</div>
+        <Spinner className="mt-4 h-6 w-6" /> : lowStock.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Tous les stocks sont confortables.</p> : <ul className="mt-4 space-y-3">{lowStock.map((product) => <li key={product.id}><Link to="/admin/produits" search={{ produit: product.id }} className="flex items-center gap-3 rounded-md p-1 transition-colors hover:bg-surface"><img src={product.image_url ?? ""} alt="" className="h-10 w-10 rounded-md object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm">{product.name}</span><span className="block text-xs text-muted-foreground">SKU : {product.sku || "Non défini"}</span></span><span className={product.stock_quantity === 0 ? "text-sm font-bold text-red-600" : "text-sm font-bold text-warning"}>{product.stock_quantity}</span></Link></li>)}</ul>}</div>
     </div>
-    <div className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="text-base font-bold">Dernières commandes</h2><Link to="/admin/commandes" className="text-sm font-semibold text-accent-strong hover:underline">Tout voir</Link></div>{listsLoading ? <Spinner className="mt-4 h-6 w-6" /> : <ul className="mt-4 divide-y divide-border">{recentOrders.map((order) => { const status = order.status as keyof typeof ORDER_STATUS_LABELS; return <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="font-medium">{order.reference}</span><span className="text-muted-foreground">{order.customer_name}</span><span className="text-muted-foreground">{order.governorate ?? "Gouvernorat non renseigné"}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${ORDER_STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}>{ORDER_STATUS_LABELS[status] ?? order.status}</span><span className="font-semibold">{formatPrice(order.total)}</span></li>; })}</ul>}</div>
+    <div className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="text-base font-bold">Dernières commandes</h2><Link to="/admin/commandes" className="text-sm font-semibold text-accent-strong hover:underline">Tout voir</Link></div>{listsLoading ? <Spinner className="mt-4 h-6 w-6" /> : <ul className="mt-4 divide-y divide-border">{recentOrders.map((order) => { const status = order.status as keyof typeof ORDER_STATUS_LABELS; return <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="font-medium">{order.reference}</span><span className="text-xs text-muted-foreground">{formatOrderDate(order.created_at)}</span><span className="text-muted-foreground">{order.customer_name}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${ORDER_STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}>{ORDER_STATUS_LABELS[status] ?? order.status}</span><span className="font-semibold">{formatPrice(order.total)}</span></li>; })}</ul>}</div>
   </div>;
 }
