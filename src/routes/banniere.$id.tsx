@@ -72,7 +72,7 @@ function BannerPage() {
       
         <div className="mt-2">
           {loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
             </div>
           ) : products.length === 0 ? (
@@ -91,7 +91,7 @@ function BannerPage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {products.map((p) => <ProductCard key={p.id} product={p} />)}
             </div>
           )}

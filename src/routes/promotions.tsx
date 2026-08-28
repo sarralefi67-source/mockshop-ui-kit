@@ -50,7 +50,7 @@ function PromotionsPage() {
       </div>
       <div className="container-page py-10">
         {loading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)}
           </div>
         ) : promos.length === 0 ? (
@@ -58,7 +58,7 @@ function PromotionsPage() {
             <p className="font-semibold">Aucune promotion en cours</p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {promos.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         )}

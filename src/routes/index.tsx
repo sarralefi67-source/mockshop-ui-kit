@@ -174,7 +174,7 @@ function HomePage() {
                 Tout voir
               </Link>
             </div>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => <ProductCardSkeleton key={i} />)
                 : promos.map((p) => <ProductCard key={p.id} product={p} />)}
@@ -187,7 +187,7 @@ function HomePage() {
       {!loading && nouveautes.length > 0 && (
         <section className="container-page py-8">
           <h2 className="section-title">Nouveautés</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {nouveautes.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </section>
@@ -198,7 +198,7 @@ function HomePage() {
         <section className=" border-border/60 py-8">
           <div className="container-page">
             <h2 className="section-title">Tous nos produits</h2>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => <ProductCardSkeleton key={i} />)
                 : products.map((p) => <ProductCard key={p.id} product={p} />)}
