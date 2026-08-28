@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ShoppingBag, TrendingUp, Users, Wallet } from "lucide-react";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from "@/data/orders";
 import { formatPrice } from "@/lib/placeholder";
@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabaseClient";
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
 
 type MonthlySale = { month: string; total: number };
+type BestSellerSale = { month: string; product_id: string | null; variant_id: string | null; product_name: string; sku: string | null; image_url: string | null; quantity: number; revenue: number };
+type BestSellerChartRow = { product: string; productName: string; imageUrl: string; quantity: number };
 type LowStockProduct = { id: string; name: string; sku: string | null; stock_quantity: number; image_url: string | null };
 type RecentOrder = { id: string; reference: string; status: string; total: number; created_at: string | null; customer_name: string; governorate: string | null };
 type Kpis = {
@@ -48,6 +50,32 @@ const formatOrderDate = (value: string | null) => {
   })}`;
 };
 
+function BestSellerTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: BestSellerChartRow }>;
+}) {
+  const row = payload?.[0]?.payload;
+  if (!active || !row) return null;
+
+  return (
+    <div className="flex max-w-xs items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-lg">
+      {row.imageUrl ? (
+        <img src={row.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+      ) : (
+        <div className="h-12 w-12 shrink-0 rounded-md bg-surface" />
+      )}
+      <div className="min-w-0 text-sm">
+        <p className="truncate font-semibold">{row.productName}</p>
+        <p className="truncate text-muted-foreground">{row.product}</p>
+        <p className="mt-1 text-accent-strong">Vendus : {row.quantity} article{row.quantity > 1 ? "s" : ""}</p>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard() {
   const [lowStock, setLowStock] = useState<LowStockProduct[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
@@ -60,6 +88,9 @@ function AdminDashboard() {
   const [kpisLoading, setKpisLoading] = useState(true);
   const [salesByMonth, setSalesByMonth] = useState<MonthlySale[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
+  const [bestSellerData, setBestSellerData] = useState<Record<string, number | string>[]>([]);
+  const [bestSellerNames, setBestSellerNames] = useState<string[]>([]);
+  const [bestSellerLoading, setBestSellerLoading] = useState(true);
   const [periodSelection, setPeriodSelection] = useState<PeriodSelection>(180);
   const [customStart, setCustomStart] = useState(() => daysAgo(6));
   const [customEnd, setCustomEnd] = useState(today);
@@ -97,6 +128,43 @@ function AdminDashboard() {
     setSalesLoading(false);
   };
 
+  const loadBestSellers = async (days = periodDays) => {
+    setBestSellerLoading(true);
+    const { data, error } = await supabase.rpc("get_admin_best_sellers", {
+      p_days: days,
+      p_end_date: periodEndDate,
+      p_limit: 8,
+    });
+    if (error) {
+      console.error("load dashboard best sellers", error);
+      setBestSellerData([]);
+      setBestSellerNames([]);
+    } else {
+      const rows = (data ?? []) as BestSellerSale[];
+      const products = new Map<string, { label: string; productName: string; imageUrl: string | null; quantity: number }>();
+      rows.forEach((item) => {
+        const key = `${item.product_id ?? item.product_name}:${item.variant_id ?? item.sku ?? ""}`;
+        const label = item.sku || "Sans SKU";
+        const current = products.get(key);
+        products.set(key, {
+          label,
+          productName: item.product_name,
+          imageUrl: item.image_url,
+          quantity: (current?.quantity ?? 0) + Number(item.quantity ?? 0),
+        });
+      });
+      const bestSellers = [...products.values()].sort((a, b) => b.quantity - a.quantity);
+      setBestSellerNames(bestSellers.map((item) => item.label));
+      setBestSellerData(bestSellers.map((item) => ({
+        product: item.label,
+        productName: item.productName,
+        imageUrl: item.imageUrl ?? "",
+        quantity: item.quantity,
+      })));
+    }
+    setBestSellerLoading(false);
+  };
+
   const loadDashboardLists = async () => {
     setListsLoading(true);
     const [stockResult, ordersResult] = await Promise.all([
@@ -116,12 +184,14 @@ function AdminDashboard() {
   useEffect(() => {
     loadKpis(periodDays);
     loadMonthlySales(periodDays);
+    loadBestSellers(periodDays);
     loadDashboardLists();
     const channel = supabase.channel("admin-dashboard-kpis") as any;
     channel
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         loadKpis(periodDays);
         loadMonthlySales(periodDays);
+        loadBestSellers(periodDays);
         loadDashboardLists();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadKpis)
@@ -182,6 +252,15 @@ function AdminDashboard() {
         <h2 className="text-base font-bold">Stock faible</h2>{listsLoading ? 
         <Spinner className="mt-4 h-6 w-6" /> : lowStock.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Tous les stocks sont confortables.</p> : <ul className="mt-4 space-y-3">{lowStock.map((product) => <li key={product.id}><Link to="/admin/produits" search={{ produit: product.id }} className="flex items-center gap-3 rounded-md p-1 transition-colors hover:bg-surface"><img src={product.image_url ?? ""} alt="" className="h-10 w-10 rounded-md object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm">{product.name}</span><span className="block text-xs text-muted-foreground">SKU : {product.sku || "Non défini"}</span></span><span className={product.stock_quantity === 0 ? "text-sm font-bold text-red-600" : "text-sm font-bold text-warning"}>{product.stock_quantity}</span></Link></li>)}</ul>}</div>
     </div>
+    <div className="rounded-xl border border-border bg-card p-5"><h2 className="text-base font-bold">Meilleures ventes</h2><div className="mt-4 h-72">
+      {bestSellerLoading ? <div className="flex h-full items-center justify-center"><Spinner className="h-6 w-6" /></div> : bestSellerNames.length === 0 ? <p className="flex h-full items-center justify-center text-sm text-muted-foreground">Aucune vente livrée sur cette période.</p> : <ResponsiveContainer width="100%" height="100%"><BarChart data={bestSellerData} margin={{ bottom: 45, left: 10, right: 20 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <XAxis dataKey="product" tickLine={false} axisLine={false} fontSize={11} angle={-25} textAnchor="end" interval={0} />
+        <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} width={35} />
+        <Tooltip cursor={{ fill: "var(--surface)" }} content={<BestSellerTooltip />} />
+        <Bar dataKey="quantity" name="Vendus" fill="var(--accent-strong)" radius={[4, 4, 0, 0]} />
+      </BarChart></ResponsiveContainer>}
+    </div></div>
     <div className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="text-base font-bold">Dernières commandes</h2><Link to="/admin/commandes" className="text-sm font-semibold text-accent-strong hover:underline">Tout voir</Link></div>{listsLoading ? <Spinner className="mt-4 h-6 w-6" /> : <ul className="mt-4 divide-y divide-border">{recentOrders.map((order) => { const status = order.status as keyof typeof ORDER_STATUS_LABELS; return <li key={order.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="font-medium">{order.reference}</span><span className="text-xs text-muted-foreground">{formatOrderDate(order.created_at)}</span><span className="text-muted-foreground">{order.customer_name}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${ORDER_STATUS_STYLES[status] ?? "bg-muted text-muted-foreground"}`}>{ORDER_STATUS_LABELS[status] ?? order.status}</span><span className="font-semibold">{formatPrice(order.total)}</span></li>; })}</ul>}</div>
   </div>;
 }

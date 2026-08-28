@@ -110,7 +110,8 @@ function AdminProducts() {
     const query = search.toLowerCase();
     return p.name.toLowerCase().includes(query)
       || p.brand.toLowerCase().includes(query)
-      || p.sku.toLowerCase().includes(query);
+      || p.sku.toLowerCase().includes(query)
+      || p.variants.some((variant) => variant.sku.toLowerCase().includes(query));
   });
   // apply stock filter
   filtered = filtered.filter((p) => {
@@ -1256,6 +1257,10 @@ function AdminProducts() {
                               </span>
                             );
                           })}
+                        </div>
+                        <div className="text-muted-foreground">
+                          <span className="font-semibold text-foreground">SKU : </span>
+                          {selectedVariant.sku || "—"}
                         </div>
                         <div className="mt-5 flex items-baseline gap-2 font-semibold">
                           <span className="text-lg">{formatPrice(selectedVariant.cost_price ?? selectedVariant.price)}</span>
