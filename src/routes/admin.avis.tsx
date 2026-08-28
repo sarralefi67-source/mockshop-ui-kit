@@ -181,7 +181,7 @@ function AdminAvis() {
     }
   };
 
-  const toggleApproval = async (id: string, to: boolean) => {
+  const toggleApproval = async (id: string, to: boolean | null) => {
     setUpdatingReviewId(id);
     try {
       const { error } = await supabase.from("reviews").update({ is_approved: to }).eq("id", id);
@@ -249,9 +249,9 @@ function AdminAvis() {
     setStatusDecision({ id, status: currentStatus });
   };
 
-  const applyStatusDecision = async (nextStatus: boolean) => {
+  const applyStatusDecision = async (nextStatus: boolean | null) => {
     if (!statusDecision) return;
-    setUpdatingStatusAction(nextStatus ? "approve" : "reject");
+    setUpdatingStatusAction(nextStatus === true ? "approve" : "reject");
     try {
       await toggleApproval(statusDecision.id, nextStatus);
       setStatusDecision(null);
@@ -463,15 +463,22 @@ function AdminAvis() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Statut</p>
-                  <span className={reviewDetails.is_approved === true
-                    ? "mt-1 inline-flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700"
-                    : reviewDetails.is_approved === false
-                      ? "mt-1 inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700"
-                      : "mt-1 inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"}
+                  <Select
+                    value={reviewDetails.is_approved === true ? "approved" : reviewDetails.is_approved === false ? "rejected" : "pending"}
+                    onValueChange={async (value) => {
+                      const nextStatus = value === "approved" ? true : value === "rejected" ? false : null;
+                      if (nextStatus !== reviewDetails.is_approved) await toggleApproval(reviewDetails.id, nextStatus);
+                    }}
                   >
-                    {reviewDetails.is_approved === true ? <CheckCircle2 className="h-4 w-4" /> : reviewDetails.is_approved === false ? <XCircle className="h-4 w-4" /> : <Clock3 className="h-4 w-4" />}
-                    {reviewDetails.is_approved === true ? "Approuvé" : reviewDetails.is_approved === false ? "Rejeté" : "En attente"}
-                  </span>
+                    <SelectTrigger className="mt-1 w-36">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">En attente</SelectItem>
+                      <SelectItem value="approved">Approuvé</SelectItem>
+                      <SelectItem value="rejected">Rejeté</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
@@ -509,9 +516,9 @@ function AdminAvis() {
       <Dialog open={Boolean(statusDecision)} onOpenChange={(v) => { if (!v) setStatusDecision(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Publier l'avis ?</DialogTitle>
+            <DialogTitle>Modifier le statut de l'avis</DialogTitle>
           </DialogHeader>
-          <p>Vous voullez publier cet avis ?</p>
+          <p>Choisissez le nouveau statut de cet avis.</p>
           <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="secondary" className="bg-red-600 text-white hover:bg-red-700" onClick={() => applyStatusDecision(false)} disabled={updatingReviewId !== null}>
               {updatingStatusAction === "reject" ? <Spinner className="h-4 w-4" /> : "Rejeter"}

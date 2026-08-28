@@ -20,7 +20,15 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { RichText } from "@/components/ui/rich-text";
 
-type LiveReview = { id: string; rating: number; comment: string | null; created_at: string | null; user_id: string | null; is_approved: boolean | null };
+type LiveReview = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string | null;
+  user_id: string | null;
+  is_approved: boolean | null;
+  profile?: { first_name: string | null; last_name: string | null } | null;
+};
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
@@ -209,12 +217,31 @@ function ProductPage() {
     query = user
       ? query.or(`is_approved.eq.true,user_id.eq.${user.id}`)
       : query.eq("is_approved", true);
-    return query.order("created_at", { ascending: false }).then(({ data, error }) => {
+    return query.order("created_at", { ascending: false }).then(async ({ data, error }) => {
       if (error) {
         console.error("load reviews", error);
         return;
       }
-      setProductReviews((data ?? []) as LiveReview[]);
+      const reviews = (data ?? []) as LiveReview[];
+      const userIds = [...new Set(reviews.map((review) => review.user_id).filter(Boolean))] as string[];
+      if (userIds.length === 0) {
+        setProductReviews(reviews);
+        return;
+      }
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", userIds);
+      if (profilesError) {
+        console.error("load review profiles", profilesError);
+        setProductReviews(reviews);
+        return;
+      }
+      const profilesById = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+      setProductReviews(reviews.map((review) => ({
+        ...review,
+        profile: review.user_id ? profilesById.get(review.user_id) ?? null : null,
+      })));
     });
   };
 
@@ -228,6 +255,10 @@ function ProductPage() {
   }, [product.id, user?.id]);
 
   const myReview = productReviews.find((r) => r.user_id === user?.id) ?? null;
+  const [visibleReviewCount, setVisibleReviewCount] = useState(10);
+  const otherReviews = productReviews.filter((r) => r.id !== myReview?.id);
+  const visibleReviews = otherReviews.slice(0, visibleReviewCount);
+  const hasMoreReviews = visibleReviewCount < otherReviews.length;
 
   const submitReview = async () => {
     if (!user) return;
@@ -546,7 +577,7 @@ function ProductPage() {
               </div>
             )}
 
-            {productReviews.filter((r) => r.id !== myReview?.id).length === 0 ? (
+            {otherReviews.length === 0 ? (
               myReview === null && (
                 <div className="rounded-xl border border-dashed border-border py-16 text-center">
                   <p className="font-semibold">Aucun avis pour ce produit</p>
@@ -554,19 +585,38 @@ function ProductPage() {
                 </div>
               )
             ) : (
-              <ul className="space-y-5">
-                {productReviews.filter((r) => r.id !== myReview?.id).map((r) => (
+              <>
+                <ul className="space-y-5">
+                {visibleReviews.map((r) => (
                   <li key={r.id} className="rounded-lg border border-border p-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <Stars value={r.rating} />
                     </div>
                     {r.comment && <p className="mt-2 text-sm text-muted-foreground">{r.comment}</p>}
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Client{r.created_at ? ` — ${new Date(r.created_at).toLocaleDateString("fr-FR")}` : ""}
+                      <span className="font-semibold">
+                        {[r.profile?.first_name, r.profile?.last_name].filter(Boolean).join(" ") || "Client"}
+                      </span>
+                      {r.created_at ? ` :  ${new Date(r.created_at).toLocaleDateString("fr-FR")}` : ""}
                     </p>
                   </li>
                 ))}
-              </ul>
+                </ul>
+                {otherReviews.length > 10 && (
+                  <Button
+                    variant="outline"
+                    className="mt-6"
+                    onClick={() =>
+                      setVisibleReviewCount((count) =>
+                        hasMoreReviews ? Math.min(count + 10, otherReviews.length) : 10,
+                      )
+                    }
+                    aria-expanded={!hasMoreReviews}
+                  >
+                    {hasMoreReviews ? "Voir plus" : "Voir moins"}
+                  </Button>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>

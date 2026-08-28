@@ -18,6 +18,7 @@ import {
 
 type SignupField = "first_name" | "last_name" | "email" | "phone" | "password";
 type SignupErrors = Partial<Record<SignupField, string>>;
+type SigninErrors = Partial<Record<"email" | "password", string>>;
 
 /**
  * Connexion et création de compte en modale : le client garde sa page (fiche
@@ -33,6 +34,7 @@ export function AuthDialog() {
   const [signupPasswordVisible, setSignupPasswordVisible] = useState(false);
   const [signinPasswordVisible, setSigninPasswordVisible] = useState(false);
   const [signupErrors, setSignupErrors] = useState<SignupErrors>({});
+  const [signinErrors, setSigninErrors] = useState<SigninErrors>({});
   const [termsError, setTermsError] = useState("");
 
   const isSignup = authDialog.mode === "signup";
@@ -51,6 +53,16 @@ export function AuthDialog() {
     const data = new FormData(event.currentTarget);
     const email = String(data.get("email") ?? "").trim();
     const password = String(data.get("password") ?? "");
+    const errors: SigninErrors = {};
+    if (!email) errors.email = "L'e-mail est obligatoire.";
+    else if (!/^\S+@\S+\.\S+$/.test(email)) errors.email = "Veuillez saisir une adresse e-mail valide.";
+    if (!password) errors.password = "Le mot de passe est obligatoire.";
+    setSigninErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      const firstInvalid = errors.email ? "auth-email" : "auth-password";
+      document.getElementById(firstInvalid)?.focus();
+      return;
+    }
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
@@ -275,17 +287,21 @@ export function AuthDialog() {
             </p>
           </form>
         ) : (
-          <form className="space-y-4" onSubmit={handleSignIn}>
+          <form className="space-y-4" onSubmit={handleSignIn} noValidate>
             <div className="space-y-2">
               <Label htmlFor="auth-email">E-mail</Label>
               <Input
                 id="auth-email"
                 name="email"
                 type="email"
-                required
                 autoComplete="email"
                 placeholder="vous@example.tn"
+                aria-invalid={Boolean(signinErrors.email)}
+                aria-describedby={signinErrors.email ? "auth-signin-email-error" : undefined}
+                className={signinErrors.email ? "border-red-600 focus-visible:ring-red-600" : undefined}
+                onChange={() => setSigninErrors((errors) => ({ ...errors, email: "" }))}
               />
+              {signinErrors.email ? <p id="auth-signin-email-error" className="text-sm text-red-600" role="alert">{signinErrors.email}</p> : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="auth-password">Mot de passe</Label>
@@ -294,10 +310,12 @@ export function AuthDialog() {
                   id="auth-password"
                   name="password"
                   type={signinPasswordVisible ? "text" : "password"}
-                  required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="pr-11"
+                  aria-invalid={Boolean(signinErrors.password)}
+                  aria-describedby={signinErrors.password ? "auth-signin-password-error" : undefined}
+                  className={`pr-11 ${signinErrors.password ? "border-red-600 focus-visible:ring-red-600" : ""}`}
+                  onChange={() => setSigninErrors((errors) => ({ ...errors, password: "" }))}
                 />
                 <button
                   type="button"
@@ -308,6 +326,7 @@ export function AuthDialog() {
                   {signinPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {signinErrors.password ? <p id="auth-signin-password-error" className="text-sm text-red-600" role="alert">{signinErrors.password}</p> : null}
             </div>
             <Button variant="accent" size="lg" type="submit" className="w-full" disabled={loading}>
               {loading ? "Connexion…" : "Se connecter"}

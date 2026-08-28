@@ -20,10 +20,24 @@ function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage("");
+    if (!email.trim()) {
+      const message = "L'adresse e-mail est obligatoire.";
+      setEmailError(message);
+      document.getElementById("forgot-email")?.focus();
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      const message = "Veuillez saisir une adresse e-mail valide.";
+      setEmailError(message);
+      document.getElementById("forgot-email")?.focus();
+      return;
+    }
+    setEmailError("");
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reinitialiser-mot-de-passe`,
@@ -50,17 +64,15 @@ function ForgotPasswordPage() {
     <StoreLayout>
       <div className="container-page flex min-h-[60vh] items-center justify-center py-12">
         <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-accent-strong/10 text-accent-strong">
-            <Mail className="h-6 w-6" />
-          </div>
-          <h1 className="page-title text-3xl">Mot de passe oublié ?</h1>
+
+          <h1 className="text-center text-3xl">Mot de passe oublié ?</h1>
           {sent ? (
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
               Si un compte correspond à cette adresse, vous recevrez un lien pour réinitialiser
               votre mot de passe.
             </p>
           ) : (
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
               {errorMessage && (
                 <p
                   role="alert"
@@ -74,12 +86,16 @@ function ForgotPasswordPage() {
                 <Input
                   id="forgot-email"
                   type="email"
-                  required
                   autoComplete="email"
-                  placeholder="vous@example.tn"
+                  placeholder="saisissez votre adresse e-mail"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => { setEmail(event.target.value); setEmailError(""); }}
+                  aria-required="true"
+                  aria-invalid={Boolean(emailError)}
+                  aria-describedby={emailError ? "forgot-email-error" : undefined}
+                  className={emailError ? "border-red-600 focus-visible:ring-red-600" : undefined}
                 />
+                {emailError ? <p id="forgot-email-error" className="text-sm text-red-600" role="alert">{emailError}</p> : null}
               </div>
               <Button
                 variant="accent"
@@ -88,7 +104,7 @@ function ForgotPasswordPage() {
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? "Envoi…" : "Recevoir le lien"}
+                {loading ? "Envoi…" : "le lien"}
               </Button>
             </form>
           )}

@@ -29,7 +29,7 @@ function ConfirmationPage() {
         <h1 className="mt-5 text-3xl font-extrabold">Merci, votre commande est confirmée !</h1>
         <p className="mt-3 text-muted-foreground">
           Référence <span className="font-semibold text-foreground">{ref}</span>. Notre équipe vous
-          appelle sous peu pour valider la livraison.
+          appelle pour valider la livraison.
         </p>
 
         <div className="mt-8 grid gap-4 text-left sm:grid-cols-2">

@@ -263,7 +263,7 @@ export async function fetchActiveBanners(): Promise<Banner[]> {
     .from("banners")
     .select(BANNER_SELECT)
     .eq("is_active", true)
-    .order("position", { ascending: true });
+    .order("created_at", { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as any[];
   const counts = await fetchBannerProductCounts(rows.map((b) => b.id));
