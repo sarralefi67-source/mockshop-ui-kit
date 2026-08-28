@@ -229,7 +229,7 @@ function ProductPage() {
         return;
       }
       const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
+        .from("review_profiles")
         .select("id, first_name, last_name")
         .in("id", userIds);
       if (profilesError) {

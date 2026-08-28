@@ -26,7 +26,7 @@ type SigninErrors = Partial<Record<"email" | "password", string>>;
  * L'ouverture passe par `openAuth()` du contexte d'authentification.
  */
 export function AuthDialog() {
-  const { authDialog, setAuthMode, closeAuth, signIn, signUp } = useAuth();
+  const { authDialog, setAuthMode, closeAuth, signIn, signUp, signOut } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [newsletter, setNewsletter] = useState(true);
@@ -68,6 +68,16 @@ export function AuthDialog() {
     setLoading(false);
     if (error) {
       toast.error(error.message || "Erreur de connexion");
+      return;
+    }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    const { data: profile } = userId
+      ? await supabase.from("profiles").select("role").eq("id", userId).maybeSingle()
+      : { data: null };
+    if (profile?.role !== "customer") {
+      await signOut();
+      toast.error("Cette connexion est réservée aux comptes clients.");
       return;
     }
     toast.success("Connecté");

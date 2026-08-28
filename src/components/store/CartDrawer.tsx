@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 export function CartDrawer() {
   const { items, cartOpen, setCartOpen, updateQuantity, removeItem, subtotal, shipping, total, coupon, count } =
     useStore();
+  const continueShopping = () => setCartOpen(false);
 
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
@@ -30,7 +31,7 @@ export function CartDrawer() {
             <p className="text-sm text-muted-foreground">
               Parcourez nos catégories et ajoutez vos premiers articles.
             </p>
-            <Button variant="accent" className="mt-2" onClick={() => setCartOpen(false)} asChild>
+            <Button variant="accent" className="mt-2" onClick={continueShopping} asChild>
               <Link to="/">Continuer mes achats</Link>
             </Button>
           </div>
@@ -125,7 +126,7 @@ export function CartDrawer() {
                 </Link>
               </Button>
               <button
-                onClick={() => setCartOpen(false)}
+                onClick={continueShopping}
                 className="mt-2 w-full text-center text-sm text-muted-foreground hover:text-foreground"
               >
                 Continuer mes achats

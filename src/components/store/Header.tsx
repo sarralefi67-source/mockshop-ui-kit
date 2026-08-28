@@ -192,12 +192,20 @@ export function Header() {
           <div className="flex items-center justify-end gap-1">
             {user ? (
               <div className="flex items-center gap-2">
-                <span className="hidden sm:block text-sm font-medium">{profile?.first_name ?? user.email}</span>
+                {profile?.role !== "admin" && (
+                  <span className="hidden text-sm font-medium sm:block">{profile?.first_name ?? user.email}</span>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => navigate({ to: profile?.role === "admin" ? "/admin/parametres" : "/compte" })}
-                  aria-label={profile?.role === "admin" ? "Paramètres" : "Mon compte"}
+                  onClick={() => {
+                    if (profile?.role === "customer") {
+                      navigate({ to: "/compte" });
+                    } else {
+                      openAuth("signin");
+                    }
+                  }}
+                  aria-label="Mon compte"
                 >
                   <User className="h-5 w-5" />
                 </Button>
