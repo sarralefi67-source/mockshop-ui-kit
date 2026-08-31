@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { isPendingSignup, useAuth } from "@/context/AuthContext";
 import { StoreLayout } from "@/components/store/StoreLayout";
 
 /**
@@ -15,14 +15,20 @@ export const Route = createFileRoute("/inscription")({
 });
 
 function RegisterRedirect() {
-  const { openAuth } = useAuth();
+  const { openAuth, user } = useAuth();
   const navigate = useNavigate();
+  const pendingSignup = isPendingSignup();
 
   useEffect(() => {
+    if (pendingSignup || user) {
+      navigate({ to: "/", replace: true });
+      return;
+    }
+
     navigate({ to: "/", replace: true });
     openAuth("signup");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pendingSignup, user]);
 
   return (
     <StoreLayout>

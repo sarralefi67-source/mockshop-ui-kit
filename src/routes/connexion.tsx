@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { StoreLayout } from "@/components/store/StoreLayout";
+import { isSafeRedirect } from "@/lib/utils";
 
 /**
  * La connexion se fait en modale (voir components/store/AuthDialog). Cette
@@ -9,8 +10,10 @@ import { StoreLayout } from "@/components/store/StoreLayout";
  * l'accueil en ouvrant la modale, en conservant la destination demandée.
  */
 export const Route = createFileRoute("/connexion")({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } =>
-    typeof search["redirect"] === "string" ? { redirect: search["redirect"] } : {},
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = search["redirect"];
+    return isSafeRedirect(redirect) ? { redirect } : {};
+  },
   head: () => ({
     meta: [{ title: "Connexion : Artisanat" }, { name: "robots", content: "noindex" }],
   }),

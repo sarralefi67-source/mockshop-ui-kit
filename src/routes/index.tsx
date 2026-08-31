@@ -6,6 +6,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/store/ProductCard
 import { isOnSale } from "@/data/products";
 import { buildCategoryTree } from "@/data/categories";
 import { fetchActiveBanners, fetchActiveProducts, fetchCategories, type Banner } from "@/lib/catalog";
+import { isSafeUrl } from "@/lib/utils";
 import type { CategoryNode, Product } from "@/types";
 import {
   Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext,
@@ -115,7 +116,12 @@ function HomePage() {
                         {slide}
                       </Link>
                     ) : (
-                      <a href={banner.link_url || "/promotions"} className="block">{slide}</a>
+                      <a
+                        href={isSafeUrl(banner.link_url) ? banner.link_url : "/promotions"}
+                        className="block"
+                      >
+                        {slide}
+                      </a>
                     )}
                   </CarouselItem>
                 );

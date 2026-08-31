@@ -86,7 +86,8 @@ export function AuthDialog() {
     }
     toast.success("Connecté");
     closeAuth();
-    navigate({ to: "/compte" });
+    const target = authDialog.redirect ?? "/compte";
+    navigate({ to: target as "/compte" });
   };
 
   const handleSignUp = async (event: React.FormEvent<HTMLFormElement>) => {

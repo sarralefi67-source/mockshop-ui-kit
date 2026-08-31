@@ -69,7 +69,7 @@ function AdminLogin() {
 
     setLoading(true);
     try {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(cleanEmail, password);
       if (error) {
         console.error("admin signIn error:", error);
         setPasswordError("Adresse e-mail ou mot de passe incorrect.");

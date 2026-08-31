@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { isSafeUrl } from "@/lib/utils";
 
 function TikTokIcon({ className }: { className?: string }) {
   return (
@@ -112,11 +113,13 @@ export function Footer() {
               { href: settings?.facebook_url, label: "Facebook", Icon: Facebook },
               { href: settings?.tiktok_url, label: "TikTok", Icon: TikTokIcon },
               { href: settings?.whatsapp_url, label: "WhatsApp", Icon: WhatsAppIcon },
-            ].map(({ href, label, Icon }) =>
-              href?.trim() ? (
+            ].map(({ href, label, Icon }) => {
+              const safeHref = typeof href === "string" ? href.trim() : "";
+              if (!isSafeUrl(safeHref)) return null;
+              return (
                 <a
                   key={label}
-                  href={href.trim()}
+                  href={safeHref}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={label}
@@ -124,8 +127,8 @@ export function Footer() {
                 >
                   <Icon className="h-4 w-4" />
                 </a>
-              ) : null,
-            )}
+              );
+            })}
           </div>
         </div>
 

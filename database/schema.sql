@@ -357,9 +357,26 @@ create policy "public read active variants" on product_variants
 create policy "public read variant images" on variant_images
   for select using (true);
 
--- Un client ne voit/gère que ses propres données
+-- Un client ne voit/gère que ses propres données.
+-- Il ne peut pas s'attribuer lui-même le role admin.
 create policy "user reads own profile" on profiles
   for select using (auth.uid() = id);
+
+create policy "user inserts own profile as customer only" on profiles
+  for insert with check (
+    auth.uid() = id
+    and role = 'customer'
+  );
+
+create policy "user updates own profile without self-promotion" on profiles
+  for update using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    and (
+      role = 'customer'
+      or role = (select role from public.profiles where id = auth.uid())
+    )
+  );
 
 create policy "user manages own wishlist" on wishlists
   for all using (auth.uid() = user_id);

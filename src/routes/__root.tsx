@@ -116,31 +116,10 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function(){
-            try{
-              var host = location.hostname;
-              if(host === 'localhost' || host === '127.0.0.1'){
-                try{ document.documentElement.removeAttribute('bbai-tooltip-injected'); }catch(e){}
-                try{ var els = document.querySelectorAll('[bbai-tooltip-injected]'); els.forEach(function(el){ el.removeAttribute('bbai-tooltip-injected'); }); }catch(e){}
-                try{
-                  var _fetch = window.fetch;
-                  window.fetch = function(input, init){
-                    try{
-                      var url = typeof input === 'string' ? input : (input && input.url);
-                      if(url && url.indexOf('useblackbox.io') !== -1){
-                        return Promise.resolve(new Response(null, { status: 204, statusText: 'No Content' }));
-                      }
-                    }catch(e){}
-                    return _fetch.apply(this, arguments);
-                  };
-                }catch(e){}
-              }
-            }catch(e){}
-          })();
-        ` }} />
+              
         {children}
         <Scripts />
+    
       </body>
     </html>
   );
