@@ -67,7 +67,7 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
-  const { user, profile, loading: authLoading, openAuth } = useAuth();
+  const { user, profile, loading: authLoading, openAuth, authDialog } = useAuth();
   const { settings } = useSiteSettings();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -164,13 +164,42 @@ function CheckoutPage() {
   }, [user]);
 
   // Compte requis pour commander : on ouvre la modale sans quitter le panier,
-  // et on revient ici une fois connecté.
+  // et on revient ici une fois connecté. Une fermeture manuelle ne doit pas
+  // réouvrir la modale en boucle — et ne doit pas non plus laisser
+  // l'utilisateur bloqué sur /checkout avec un "Redirection…" qui ne mène
+  // nulle part : si la modale se ferme sans connexion (annulation), on le
+  // renvoie vers la boutique plutôt que de le laisser figé sur cette page.
+  const checkoutAuthPrompted = useRef(false);
+  const authDialogWasOpen = useRef(false);
   useEffect(() => {
-    if (!authLoading && !user) {
-      openAuth("signin", "/checkout");
+    if (authLoading) return;
+
+    if (user) {
+      checkoutAuthPrompted.current = false;
+      authDialogWasOpen.current = false;
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user]);
+
+    if (authDialog.open) {
+      authDialogWasOpen.current = true;
+      return;
+    }
+
+    // La modale vient de se fermer et l'utilisateur n'est toujours pas
+    // connecté : c'est une annulation, pas un chargement initial. On ne
+    // réaffiche pas la modale et on quitte /checkout pour éviter de rester
+    // coincé sur "Redirection…" sans redirection réelle.
+    if (authDialogWasOpen.current) {
+      authDialogWasOpen.current = false;
+      checkoutAuthPrompted.current = false;
+      navigate({ to: "/" });
+      return;
+    }
+
+    if (checkoutAuthPrompted.current) return;
+    checkoutAuthPrompted.current = true;
+    openAuth("signin", "/checkout");
+  }, [authLoading, user, authDialog.open, openAuth, navigate]);
 
   // Tarif unique pour toute la Tunisie : tous les gouvernorats sont livrables,
   // il n'y a plus de bareme a charger ni de destination a exclure.

@@ -128,10 +128,13 @@ export function AuthDialog() {
     });
     setLoading(false);
     if (error) {
+      const normalizedMessage = String(error.message ?? "").toLowerCase();
       const message =
         error.message === "User already registered"
           ? "Un compte existe déjà avec cet e-mail. Essayez de vous connecter."
-          : error.message || "Erreur lors de la création du compte";
+          : normalizedMessage.includes("rate limit exceeded") || normalizedMessage.includes("rate_limit_exceeded")
+            ? "Trop de demandes envoyées. Merci d’attendre quelques secondes avant de réessayer."
+            : error.message || "Erreur lors de la création du compte";
       toast.error(message);
       return;
     }

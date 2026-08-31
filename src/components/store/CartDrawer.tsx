@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Minus, Plus, ShoppingBag, Trash2, Truck } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
+import { useAuth } from "@/context/AuthContext";
 import { formatPrice, formatShipping } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -9,7 +10,24 @@ import { Separator } from "@/components/ui/separator";
 export function CartDrawer() {
   const { items, cartOpen, setCartOpen, updateQuantity, removeItem, subtotal, shipping, total, coupon, count } =
     useStore();
+  const { user, openAuth } = useAuth();
+  const navigate = useNavigate();
   const continueShopping = () => setCartOpen(false);
+
+  // Si l'utilisateur n'est pas connecté, on ne navigue pas vers /checkout :
+  // on ouvre directement la modale de connexion par-dessus le panier. Ainsi,
+  // s'il annule, il reste simplement sur la page où il était (panier /
+  // boutique) au lieu de se retrouver coincé sur /checkout avec un
+  // "Redirection…" qui ne mène nulle part. On ne navigue vers /checkout
+  // qu'une fois la connexion effective.
+  const handleCheckout = () => {
+    if (!user) {
+      openAuth("signin", "/checkout");
+      return;
+    }
+    setCartOpen(false);
+    navigate({ to: "/checkout" });
+  };
 
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
@@ -120,10 +138,8 @@ export function CartDrawer() {
                   <dd className="font-bold text-accent-strong">{formatPrice(total)}</dd>
                 </div>
               </dl>
-              <Button variant="accent" size="lg" className="mt-4 w-full" asChild>
-                <Link to="/checkout" onClick={() => setCartOpen(false)}>
-                  Passer la commande
-                </Link>
+              <Button variant="accent" size="lg" className="mt-4 w-full" onClick={handleCheckout}>
+                Passer la commande
               </Button>
               <button
                 onClick={continueShopping}

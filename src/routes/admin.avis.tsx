@@ -67,7 +67,7 @@ function AdminAvis() {
   const [confirmDeleteIds, setConfirmDeleteIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [updatingReviewId, setUpdatingReviewId] = useState<string | null>(null);
-  const [updatingStatusAction, setUpdatingStatusAction] = useState<"approve" | "reject" | null>(null);
+  const [updatingStatusAction, setUpdatingStatusAction] = useState<"approve" | "reject" | "pending" | null>(null);
   const [statusDecision, setStatusDecision] = useState<{ id: string; status: boolean | null | undefined } | null>(null);
   const [reviewDetails, setReviewDetails] = useState<ReviewRow | null>(null);
   const { review: focusReviewId } = Route.useSearch();
@@ -187,7 +187,12 @@ function AdminAvis() {
       const { error } = await supabase.from("reviews").update({ is_approved: to }).eq("id", id);
       if (error) throw error;
       setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_approved: to } : r)));
-      toast.success(to ? "Avis approuvé." : "Avis rejeté.");
+      setReviewDetails((prev) => (prev && prev.id === id ? { ...prev, is_approved: to } : prev));
+      if (to === null) {
+        toast.success("Avis remis en attente.");
+      } else {
+        toast.success(to ? "Avis approuvé." : "Avis rejeté.");
+      }
     } catch (err) {
       console.error("toggleApproval", err);
       toast.error("Impossible de mettre à jour l'état de l'avis.");
@@ -251,7 +256,7 @@ function AdminAvis() {
 
   const applyStatusDecision = async (nextStatus: boolean | null) => {
     if (!statusDecision) return;
-    setUpdatingStatusAction(nextStatus === true ? "approve" : "reject");
+    setUpdatingStatusAction(nextStatus === true ? "approve" : nextStatus === false ? "reject" : "pending");
     try {
       await toggleApproval(statusDecision.id, nextStatus);
       setStatusDecision(null);
@@ -465,9 +470,11 @@ function AdminAvis() {
                   <p className="text-muted-foreground">Statut</p>
                   <Select
                     value={reviewDetails.is_approved === true ? "approved" : reviewDetails.is_approved === false ? "rejected" : "pending"}
-                    onValueChange={async (value) => {
+                    onValueChange={(value) => {
                       const nextStatus = value === "approved" ? true : value === "rejected" ? false : null;
-                      if (nextStatus !== reviewDetails.is_approved) await toggleApproval(reviewDetails.id, nextStatus);
+                      if (nextStatus !== reviewDetails.is_approved) {
+                        setStatusDecision({ id: reviewDetails.id, status: nextStatus });
+                      }
                     }}
                   >
                     <SelectTrigger className="mt-1 w-36">
@@ -520,6 +527,7 @@ function AdminAvis() {
           </DialogHeader>
           <p>Choisissez le nouveau statut de cet avis.</p>
           <DialogFooter className="gap-2 sm:justify-end">
+           
             <Button variant="secondary" className="bg-red-600 text-white hover:bg-red-700" onClick={() => applyStatusDecision(false)} disabled={updatingReviewId !== null}>
               {updatingStatusAction === "reject" ? <Spinner className="h-4 w-4" /> : "Rejeter"}
             </Button>
