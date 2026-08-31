@@ -67,7 +67,11 @@ export function AuthDialog() {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) {
-      toast.error(error.message || "Erreur de connexion");
+      const message =
+        error.message === "Invalid login credentials"
+          ? "Identifiants invalides. Vérifiez votre e-mail et votre mot de passe."
+          : error.message || "Erreur de connexion";
+      toast.error(message);
       return;
     }
     const { data: sessionData } = await supabase.auth.getSession();
@@ -124,7 +128,11 @@ export function AuthDialog() {
     });
     setLoading(false);
     if (error) {
-      toast.error(error.message || "Erreur lors de la création du compte");
+      const message =
+        error.message === "User already registered"
+          ? "Un compte existe déjà avec cet e-mail. Essayez de vous connecter."
+          : error.message || "Erreur lors de la création du compte";
+      toast.error(message);
       return;
     }
     if (newsletter) {

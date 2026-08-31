@@ -29,12 +29,12 @@ create policy "admins can read sales ledger"
   on public.sales_ledger for select
   using (public.is_admin());
 
-create or replace function public.capture_delivered_order_items()
-returns trigger
+create or replace function public.captu
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $$re_delivered_order_items()
+returns trigger
 declare
   delivered_at_value timestamptz;
 begin

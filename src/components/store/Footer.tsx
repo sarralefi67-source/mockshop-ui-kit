@@ -177,7 +177,7 @@ export function Footer() {
 
       <div className="border-t border-deep-foreground/15 py-5">
         <p className="container-page text-center text-xs text-deep-foreground/60">
-          © 2026 Artisanat — Paiement à la livraison uniquement.
+          © 2026 Artisanat 
         </p>
       </div>
     </footer>

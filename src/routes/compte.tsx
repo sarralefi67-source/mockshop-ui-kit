@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState, useNavigate } from "@tan
 import { useEffect } from "react";
 import { Heart, LogOut, MapPin, Package, User } from "lucide-react";
 import { StoreLayout } from "@/components/store/StoreLayout";
-import { useAuth } from "@/context/AuthContext";
+import { isPendingSignup, useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/compte")({
@@ -28,17 +28,25 @@ function AccountLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, profile, loading, signOut, openAuth } = useAuth();
   const navigate = useNavigate();
+  const pendingSignup = isPendingSignup();
+
   useEffect(() => {
     if (loading || user) return;
+    if (pendingSignup) {
+      navigate({ to: "/", replace: true });
+      return;
+    }
     navigate({ to: "/" });
     openAuth("signin", "/compte");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user]);
+  }, [loading, user, pendingSignup]);
 
   if (loading || !user) {
     return (
       <StoreLayout>
-        <div className="container-page py-24 text-center text-muted-foreground">Chargement…</div>
+        <div className="container-page py-24 text-center text-muted-foreground">
+          {pendingSignup ? "Vérifiez votre e-mail pour confirmer votre compte avant de vous connecter." : "Chargement…"}
+        </div>
       </StoreLayout>
     );
   }

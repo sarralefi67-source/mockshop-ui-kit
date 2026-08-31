@@ -36,6 +36,22 @@ type AuthContextValue = {
   closeAuth: () => void;
 };
 
+export const PENDING_SIGNUP_STORAGE_KEY = "artisanat.pendingSignup";
+
+export const isPendingSignup = () => {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(PENDING_SIGNUP_STORAGE_KEY) === "1";
+};
+
+export const setPendingSignup = (pending: boolean) => {
+  if (typeof window === "undefined") return;
+  if (pending) {
+    window.localStorage.setItem(PENDING_SIGNUP_STORAGE_KEY, "1");
+    return;
+  }
+  window.localStorage.removeItem(PENDING_SIGNUP_STORAGE_KEY);
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -48,8 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     redirect: null,
   });
 
-  const openAuth = (mode: AuthMode = "signin", redirect: string | null = null) =>
+  const openAuth = (mode: AuthMode = "signin", redirect: string | null = null) => {
+    if (mode === "signin") setPendingSignup(false);
     setAuthDialog({ open: true, mode, redirect });
+  };
   const setAuthMode = (mode: AuthMode) => setAuthDialog((prev) => ({ ...prev, mode }));
   const closeAuth = () => setAuthDialog((prev) => ({ ...prev, open: false }));
 
@@ -95,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // debug logs to surface API error details during development
     if (res.error) console.error("signIn error:", res.error, "response:", res.data);
     if (!res.error && res.data?.user) {
+      setPendingSignup(false);
       const { data: p } = await supabase.from("profiles").select("*").eq("id", res.data.user.id).maybeSingle();
       setProfile(p ?? null);
     }
@@ -119,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (res.error) console.error("signUp error:", res.error, "response:", res.data);
   const u = res.data?.user ?? null;
   if (!res.error && u) {
+    setPendingSignup(Boolean(!res.data.session));
     try {
       const { data: p, error: fetchErr } = await supabase.from("profiles").select("*").eq("id", u.id).maybeSingle();
       if (fetchErr) {
