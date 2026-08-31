@@ -10,18 +10,19 @@ import { Separator } from "@/components/ui/separator";
 export function CartDrawer() {
   const { items, cartOpen, setCartOpen, updateQuantity, removeItem, subtotal, shipping, total, coupon, count } =
     useStore();
-  const { user, openAuth } = useAuth();
+  const { isCustomer, openAuth } = useAuth();
   const navigate = useNavigate();
   const continueShopping = () => setCartOpen(false);
 
-  // Si l'utilisateur n'est pas connecté, on ne navigue pas vers /checkout :
-  // on ouvre directement la modale de connexion par-dessus le panier. Ainsi,
-  // s'il annule, il reste simplement sur la page où il était (panier /
-  // boutique) au lieu de se retrouver coincé sur /checkout avec un
-  // "Redirection…" qui ne mène nulle part. On ne navigue vers /checkout
-  // qu'une fois la connexion effective.
+  // isCustomer (et non un simple `user`) : la session Supabase est partagée
+  // avec le back-office admin (même navigateur, même client). Un admin
+  // connecté sur /admin ne doit pas pouvoir "passer commande" avec son
+  // propre compte juste parce qu'une session existe. S'il n'y a pas de
+  // compte client actif, on ouvre la modale par-dessus le panier au lieu de
+  // naviguer vers /checkout ; en cas d'annulation, l'utilisateur reste
+  // simplement là où il était.
   const handleCheckout = () => {
-    if (!user) {
+    if (!isCustomer) {
       openAuth("signin", "/checkout");
       return;
     }

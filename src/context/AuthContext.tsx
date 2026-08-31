@@ -20,6 +20,15 @@ type AuthContextValue = {
   user: any | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * true uniquement si une session Supabase est active ET que le profil
+   * associé a le rôle "customer". La session Supabase est partagée entre
+   * la vitrine et le back-office admin (même client, même storage du
+   * navigateur) : un admin connecté sur /admin peut donc apparaître comme
+   * "user" ici. Tout code vitrine qui gère commande/compte client doit se
+   * baser sur `isCustomer`, jamais sur `user` seul.
+   */
+  isCustomer: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: any }>;
   signUp: (
     email: string,
@@ -158,9 +167,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
   }
 
+  const isCustomer = Boolean(user) && profile?.role === "customer";
+
   return (
     <AuthContext.Provider
-      value={{ user, profile, loading, signIn, signUp, signOut, authDialog, openAuth, setAuthMode, closeAuth }}
+      value={{
+        user,
+        profile,
+        loading,
+        isCustomer,
+        signIn,
+        signUp,
+        signOut,
+        authDialog,
+        openAuth,
+        setAuthMode,
+        closeAuth,
+      }}
     >
       {children}
     </AuthContext.Provider>

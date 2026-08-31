@@ -42,7 +42,7 @@ function Logo({ className }: { className?: string }) {
 
 export function Header() {
   const { count, setCartOpen, wishlist } = useStore();
-  const { user, profile, signOut, openAuth } = useAuth();
+  const { user, profile, isCustomer, openAuth } = useAuth();
   const { settings } = useSiteSettings();
   const [query, setQuery] = useState("");
   const [searchReady, setSearchReady] = useState(false);
@@ -190,21 +190,20 @@ export function Header() {
           </div>
 
           <div className="flex items-center justify-end gap-1">
-            {user ? (
+            {/*
+              On se base sur isCustomer (session + rôle "customer"), jamais
+              sur `user` seul : la session Supabase est partagée avec le
+              back-office admin (même navigateur, même client). Un admin
+              connecté sur /admin ne doit jamais apparaître comme un client
+              connecté ici, ni accéder à /compte via ce bouton.
+            */}
+            {isCustomer ? (
               <div className="flex items-center gap-2">
-                {profile?.role !== "admin" && (
-                  <span className="hidden text-sm font-medium sm:block">{profile?.first_name ?? user.email}</span>
-                )}
+                <span className="hidden text-sm font-medium sm:block">{profile?.first_name ?? user.email}</span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    if (profile?.role === "customer") {
-                      navigate({ to: "/compte" });
-                    } else {
-                      openAuth("signin");
-                    }
-                  }}
+                  onClick={() => navigate({ to: "/compte" })}
                   aria-label="Mon compte"
                 >
                   <User className="h-5 w-5" />

@@ -67,7 +67,7 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const { items, subtotal, coupon, applyCoupon, removeCoupon, clearCart } = useStore();
-  const { user, profile, loading: authLoading, openAuth, authDialog } = useAuth();
+  const { user, profile, isCustomer, loading: authLoading, openAuth, authDialog } = useAuth();
   const { settings } = useSiteSettings();
   const [code, setCode] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -174,7 +174,12 @@ function CheckoutPage() {
   useEffect(() => {
     if (authLoading) return;
 
-    if (user) {
+    // isCustomer (et non `user`) : la session Supabase est partagée avec le
+    // back-office admin (même navigateur, même client). Si un admin est
+    // connecté sur /admin, `user` existe ici aussi mais ce n'est pas un
+    // compte client — il ne doit ni voir le formulaire de commande, ni
+    // pouvoir le soumettre avec son propre id.
+    if (isCustomer) {
       checkoutAuthPrompted.current = false;
       authDialogWasOpen.current = false;
       return;
@@ -185,8 +190,8 @@ function CheckoutPage() {
       return;
     }
 
-    // La modale vient de se fermer et l'utilisateur n'est toujours pas
-    // connecté : c'est une annulation, pas un chargement initial. On ne
+    // La modale vient de se fermer et on n'a toujours pas de compte client
+    // (annulation, ou session admin qui n'est pas censée commander) : on ne
     // réaffiche pas la modale et on quitte /checkout pour éviter de rester
     // coincé sur "Redirection…" sans redirection réelle.
     if (authDialogWasOpen.current) {
@@ -199,7 +204,7 @@ function CheckoutPage() {
     if (checkoutAuthPrompted.current) return;
     checkoutAuthPrompted.current = true;
     openAuth("signin", "/checkout");
-  }, [authLoading, user, authDialog.open, openAuth, navigate]);
+  }, [authLoading, isCustomer, authDialog.open, openAuth, navigate]);
 
   // Tarif unique pour toute la Tunisie : tous les gouvernorats sont livrables,
   // il n'y a plus de bareme a charger ni de destination a exclure.
@@ -309,7 +314,7 @@ function CheckoutPage() {
     }
   };
 
-  if (authLoading || !user) {
+  if (authLoading || !isCustomer) {
     return (
       <StoreLayout>
         <div className="container-page py-24 text-center text-muted-foreground">Redirection…</div>
