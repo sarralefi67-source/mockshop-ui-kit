@@ -275,7 +275,7 @@ function AdminAvis() {
 
         <div className="mt-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <Input className="w-64 sm:w-80" placeholder="Rechercher par SKU produit ou email" value={query} onChange={(e) => setQuery(String(e.target.value))} />
+            <Input className="w-64 sm:w-80" placeholder="Rechercher par SKU produit" value={query} onChange={(e) => setQuery(String(e.target.value))} />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
