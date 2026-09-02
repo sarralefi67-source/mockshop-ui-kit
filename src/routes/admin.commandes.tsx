@@ -24,12 +24,14 @@ import {
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Pagination, PaginationContent, PaginationLink, PaginationItem, PaginationPrevious, PaginationNext, PaginationEllipsis } from "@/components/ui/pagination";
 import { takeAdminFocus } from "@/lib/admin-focus";
 import { jsPDF } from "jspdf";
+import OrderStatusTimeline from "@/components/store/OrderStatusTimeline";
 
 export const Route = createFileRoute("/admin/commandes")({
   // Liens profonds depuis les notifications : `?order=<uuid>`, ou `?ref=<numéro>`
@@ -117,7 +119,20 @@ type ShippingRate = {
   is_active: boolean;
 };
 
-const emptyOrderDraft = () => ({
+type OrderDraft = {
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  governorate: string;
+  address_line: string;
+  city: string;
+  payment_method: string;
+  status: OrderStatus;
+  coupon_code: string;
+  note: string;
+};
+
+const emptyOrderDraft = (): OrderDraft => ({
   customer_name: "",
   customer_email: "",
   customer_phone: "",
@@ -252,9 +267,12 @@ function AdminOrders() {
   const [dateSortDir, setDateSortDir] = useState<'asc' | 'desc' | null>(null);
   const [governorateSearch, setGovernorateSearch] = useState("");
   const [isGovernorateMenuOpen, setIsGovernorateMenuOpen] = useState(false);
-  const [draft, setDraft] = useState<ReturnType<typeof emptyOrderDraft>>(emptyOrderDraft());
+  const [draft, setDraft] = useState<OrderDraft>(emptyOrderDraft());
   const [validatedCoupon, setValidatedCoupon] = useState<any | null>(null);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [statusNoteOpen, setStatusNoteOpen] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ id: string; status: OrderStatus } | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -524,11 +542,18 @@ function AdminOrders() {
     }
   };
 
-  const changeStatus = async (id: string, status: OrderStatus) => {
-    // Optimistic update
-    setList((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-    setDetail((d: Order | null) => (d && d.id === id ? { ...d, status } : d));
-    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+  const openStatusNote = (id: string, status: OrderStatus) => {
+    setPendingStatusChange({ id, status });
+    setStatusNote("");
+    setStatusNoteOpen(true);
+  };
+
+  const changeStatus = async (id: string, status: OrderStatus, note: string) => {
+    const { error } = await supabase.rpc("admin_update_order_status", {
+      p_order_id: id,
+      p_new_status: status,
+      p_note: note.trim() || null,
+    });
     if (error) {
       console.error(error);
       toast.error("Impossible de mettre à jour le statut.");
@@ -540,7 +565,16 @@ function AdminOrders() {
       }
       return;
     }
+    setList((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    setDetail((d: Order | null) => (d && d.id === id ? { ...d, status } : d));
     toast.success(`Statut mis à jour : ${(ORDER_STATUS_LABELS as any)[status] ?? status}`);
+  };
+
+  const submitStatusChange = async () => {
+    if (!pendingStatusChange) return;
+    await changeStatus(pendingStatusChange.id, pendingStatusChange.status, statusNote);
+    setStatusNoteOpen(false);
+    setPendingStatusChange(null);
   };
 
   const exportPDF = (rows: Order[]) => {
@@ -1273,29 +1307,31 @@ function AdminOrders() {
                       <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-sm font-medium", ORDER_STATUS_STYLES[o.status])}>
                         {(ORDER_STATUS_LABELS as any)[o.status] ?? o.status}
                       </span>
-                      <Popover open={editingStatusId === o.id} onOpenChange={(open) => setEditingStatusId(open ? o.id : null)}>
-                        <PopoverTrigger asChild>
-                            <Button size="icon" variant="ghost" aria-label="Modifier le statut">
-                              <SlidersHorizontal className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                        <PopoverContent className="w-44 p-2">
-                          <div className="flex flex-col gap-1">
-                            {statuses
-                              .filter((s) => s === o.status || (allowedTransitions[o.status] || []).includes(s))
-                              .map((s) => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  className="w-full text-left rounded px-2 py-1 text-sm hover:bg-accent"
-                                  onClick={() => { changeStatus(o.id, s as OrderStatus); setEditingStatusId(null); }}
-                                >
-                                  {(ORDER_STATUS_LABELS as any)[s] ?? s}
-                                </button>
-                              ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                      {o.status !== "delivered" && (
+                        <Popover open={editingStatusId === o.id} onOpenChange={(open) => setEditingStatusId(open ? o.id : null)}>
+                          <PopoverTrigger asChild>
+                              <Button size="icon" variant="ghost" aria-label="Modifier le statut">
+                                <SlidersHorizontal className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                          <PopoverContent className="w-44 p-2">
+                            <div className="flex flex-col gap-1">
+                              {statuses
+                                .filter((s) => s === o.status || (allowedTransitions[o.status] || []).includes(s))
+                                .map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    className="w-full text-left rounded px-2 py-1 text-sm hover:bg-accent"
+                                    onClick={() => { openStatusNote(o.id, s as OrderStatus); setEditingStatusId(null); }}
+                                  >
+                                    {(ORDER_STATUS_LABELS as any)[s] ?? s}
+                                  </button>
+                                ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
                     </div>
                   </TableCell>
                    <TableCell className="text-muted-foreground">
@@ -1396,8 +1432,8 @@ function AdminOrders() {
             <div className="grid gap-4 py-2">
               <div className="space-y-2">
                 <Label>Client</Label>
-                <Input id="order-customer_name" value={draft.customer_name} onChange={(e) => { setDraft({ ...draft, customer_name: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_name: "" })); }} placeholder="Nom et prénom" aria-invalid={Boolean(orderFieldErrors.customer_name)} className={orderFieldErrors.customer_name ? "border-red-500 focus-visible:ring-red-500" : undefined} />
-                {orderFieldErrors.customer_name && <p className="text-sm text-red-600">{orderFieldErrors.customer_name}</p>}
+                <Input id="order-customer_name" value={draft.customer_name} onChange={(e) => { setDraft({ ...draft, customer_name: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_name: "" })); }} placeholder="Nom et prénom" aria-invalid={Boolean(orderFieldErrors["customer_name"])} className={orderFieldErrors["customer_name"] ? "border-red-500 focus-visible:ring-red-500" : undefined} />
+                {orderFieldErrors["customer_name"] && <p className="text-sm text-red-600">{orderFieldErrors["customer_name"]}</p>}
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1408,8 +1444,8 @@ function AdminOrders() {
 
                 <div className="space-y-2">
                   <Label>Téléphone</Label>
-                  <Input id="order-customer_phone" value={draft.customer_phone} onChange={(e) => { setDraft({ ...draft, customer_phone: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_phone: "" })); }} placeholder="+216 ..." aria-invalid={Boolean(orderFieldErrors.customer_phone)} className={orderFieldErrors.customer_phone ? "border-red-500 focus-visible:ring-red-500" : undefined} />
-                  {orderFieldErrors.customer_phone && <p className="text-sm text-red-600">{orderFieldErrors.customer_phone}</p>}
+                  <Input id="order-customer_phone" value={draft.customer_phone} onChange={(e) => { setDraft({ ...draft, customer_phone: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, customer_phone: "" })); }} placeholder="+216 ..." aria-invalid={Boolean(orderFieldErrors["customer_phone"])} className={orderFieldErrors["customer_phone"] ? "border-red-500 focus-visible:ring-red-500" : undefined} />
+                  {orderFieldErrors["customer_phone"] && <p className="text-sm text-red-600">{orderFieldErrors["customer_phone"]}</p>}
                 </div>
               </div>
 
@@ -1429,8 +1465,8 @@ function AdminOrders() {
                         setIsGovernorateMenuOpen(true);
                       }}
                       placeholder="Rechercher un gouvernorat…"
-                      aria-invalid={Boolean(orderFieldErrors.governorate)}
-                      className={orderFieldErrors.governorate ? "border-red-500 focus-visible:ring-red-500" : undefined}
+                      aria-invalid={Boolean(orderFieldErrors["governorate"])}
+                      className={orderFieldErrors["governorate"] ? "border-red-500 focus-visible:ring-red-500" : undefined}
                     />
                     {isGovernorateMenuOpen && (
                       <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-background shadow-md">
@@ -1457,7 +1493,7 @@ function AdminOrders() {
                       </div>
                     )}
                   </div>
-                  {orderFieldErrors.governorate && <p className="text-sm text-red-600">{orderFieldErrors.governorate}</p>}
+                  {orderFieldErrors["governorate"] && <p className="text-sm text-red-600">{orderFieldErrors["governorate"]}</p>}
                   {selectedShippingRate && (
                     <p className="text-xs text-muted-foreground">
                       Frais de livraison : {formatPrice(selectedShippingRate.price)}
@@ -1486,10 +1522,10 @@ function AdminOrders() {
                     value={draft.address_line}
                     onChange={(e) => { setDraft({ ...draft, address_line: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, address_line: "" })); }}
                     placeholder="Rue, numéro, bâtiment..."
-                    aria-invalid={Boolean(orderFieldErrors.address_line)}
-                    className={orderFieldErrors.address_line ? "border-red-500 focus-visible:ring-red-500" : undefined}
+                    aria-invalid={Boolean(orderFieldErrors["address_line"])}
+                    className={orderFieldErrors["address_line"] ? "border-red-500 focus-visible:ring-red-500" : undefined}
                   />
-                  {orderFieldErrors.address_line && <p className="text-sm text-red-600">{orderFieldErrors.address_line}</p>}
+                  {orderFieldErrors["address_line"] && <p className="text-sm text-red-600">{orderFieldErrors["address_line"]}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label>Ville</Label>
@@ -1498,10 +1534,10 @@ function AdminOrders() {
                     value={draft.city}
                     onChange={(e) => { setDraft({ ...draft, city: e.target.value }); setOrderFieldErrors((errors) => ({ ...errors, city: "" })); }}
                     placeholder="Ville"
-                    aria-invalid={Boolean(orderFieldErrors.city)}
-                    className={orderFieldErrors.city ? "border-red-500 focus-visible:ring-red-500" : undefined}
+                    aria-invalid={Boolean(orderFieldErrors["city"])}
+                    className={orderFieldErrors["city"] ? "border-red-500 focus-visible:ring-red-500" : undefined}
                   />
-                  {orderFieldErrors.city && <p className="text-sm text-red-600">{orderFieldErrors.city}</p>}
+                  {orderFieldErrors["city"] && <p className="text-sm text-red-600">{orderFieldErrors["city"]}</p>}
                 </div>
               </div>
 
@@ -1868,12 +1904,18 @@ function AdminOrders() {
       </Dialog>
 
       <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto pb-4">
-          <DialogHeader>
+        <DialogContent className="flex max-w-lg max-h-[85vh] flex-col gap-0 overflow-hidden pb-0">
+          <DialogHeader className="shrink-0 pb-4">
             <DialogTitle>Commande {detail?.reference}</DialogTitle>
           </DialogHeader>
           {detail && (
-            <div className="space-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <Tabs defaultValue="details" className="space-y-2">
+              <TabsList className="w-full">
+                <TabsTrigger value="details" className="flex-1">Détails</TabsTrigger>
+                <TabsTrigger value="history" className="flex-1">Suivi</TabsTrigger>
+              </TabsList>
+              <TabsContent value="details" className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Passée le : {detail.created_at ? new Date(detail.created_at).toLocaleString("fr-FR") : "Date non renseignée"}
               </p>
@@ -1941,25 +1983,31 @@ function AdminOrders() {
                 <div className="flex justify-between font-bold"><dt>Total (COD)</dt><dd>{formatPrice(detail.total)}</dd></div>
               </dl>
 
-              {/* status editor moved to DialogFooter */}
+              </TabsContent>
+              <TabsContent value="history">
+                <OrderStatusTimeline orderId={detail.id} className="border-t-0 pt-2" />
+              </TabsContent>
+              </Tabs>
             </div>
           )}
-        <DialogFooter className="sticky bottom-0 left-0 right-0 z-10 -mx-6 -mb-4 border-t border-border bg-background px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        <DialogFooter className="shrink-0 -mx-6 mt-4 border-t border-border bg-background px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {detail && (
             <div className="flex w-full items-end gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="mb-2 text-sm font-medium">Changer le statut</p>
-                <Select value={detail.status} onValueChange={(v) => changeStatus(detail.id, v as OrderStatus)}>
-                  <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {statuses
-                      .filter((s) => s === detail.status || (allowedTransitions[detail.status] || []).includes(s))
-                      .map((s) => (
-                        <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {detail.status !== "delivered" && (
+                <div className="min-w-0 flex-1">
+                  <p className="mb-2 text-sm font-medium">Changer le statut</p>
+                  <Select value={detail.status} onValueChange={(v) => openStatusNote(detail.id, v as OrderStatus)}>
+                    <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {statuses
+                        .filter((s) => s === detail.status || (allowedTransitions[detail.status] || []).includes(s))
+                        .map((s) => (
+                          <SelectItem key={s} value={s}>{(ORDER_STATUS_LABELS as any)[s] ?? s}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -1975,6 +2023,45 @@ function AdminOrders() {
             </div>
           )}
         </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={statusNoteOpen} onOpenChange={(open) => {
+        setStatusNoteOpen(open);
+        if (!open) {
+          setPendingStatusChange(null);
+          setStatusNote("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajouter une note au changement de statut</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Nouveau statut : <span className="font-semibold text-foreground">
+                {pendingStatusChange
+                  ? ORDER_STATUS_LABELS[pendingStatusChange.status]
+                  : "-"}
+              </span>
+            </p>
+            <Textarea
+              value={statusNote}
+              onChange={(event) => setStatusNote(event.target.value)}
+              placeholder="Note visible dans le suivi de la commande (facultatif)"
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusNoteOpen(false)}>Annuler</Button>
+            <Button
+              variant="accent"
+              onClick={submitStatusChange}
+              disabled={!pendingStatusChange}
+            >
+              Enregistrer le statut
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

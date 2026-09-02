@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_status_history: {
+        Row: {
+          id: string
+          order_id: string
+          status: string | null
+          new_status: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          status?: string | null
+          new_status?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          status?: string | null
+          new_status?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       addresses: {
         Row: {
           city: string | null
@@ -1052,6 +1079,14 @@ export type Database = {
       validate_coupon: {
         Args: { p_code: string; p_subtotal: number }
         Returns: Json
+      }
+      admin_update_order_status: {
+        Args: {
+          p_order_id: string
+          p_new_status: string
+          p_note?: string | null
+        }
+        Returns: undefined
       }
     }
     Enums: {

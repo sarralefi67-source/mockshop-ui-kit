@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { OrderStatus, Order } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import OrderStatusTimeline from "@/components/store/OrderStatusTimeline";
 
 export const Route = createFileRoute("/compte/commandes")({
   component: AccountOrders,
@@ -154,6 +155,7 @@ function AccountOrders() {
                     <div className="flex justify-between"><dt className="text-muted-foreground">Livraison ({order.governorate})</dt><dd>{formatPrice(order.shipping)}</dd></div>
                     <div className="flex justify-between font-bold"><dt>Total (payé à la livraison)</dt><dd>{formatPrice(order.total)}</dd></div>
                   </dl>
+                  <OrderStatusTimeline orderId={order.id} />
                 </div>
               )}
             </li>
