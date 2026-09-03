@@ -548,6 +548,14 @@ function AdminOrders() {
     setStatusNoteOpen(true);
   };
 
+  const requestStatusChange = (id: string, status: OrderStatus) => {
+    if (status === "cancelled") {
+      openStatusNote(id, status);
+      return;
+    }
+    void changeStatus(id, status, "");
+  };
+
   const changeStatus = async (id: string, status: OrderStatus, note: string) => {
     const { error } = await supabase.rpc("admin_update_order_status", {
       p_order_id: id,
@@ -1307,7 +1315,7 @@ function AdminOrders() {
                       <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-sm font-medium", ORDER_STATUS_STYLES[o.status])}>
                         {(ORDER_STATUS_LABELS as any)[o.status] ?? o.status}
                       </span>
-                      {o.status !== "delivered" && (
+                      {o.status !== "delivered" && o.status !== "cancelled" && (
                         <Popover open={editingStatusId === o.id} onOpenChange={(open) => setEditingStatusId(open ? o.id : null)}>
                           <PopoverTrigger asChild>
                               <Button size="icon" variant="ghost" aria-label="Modifier le statut">
@@ -1323,7 +1331,7 @@ function AdminOrders() {
                                     key={s}
                                     type="button"
                                     className="w-full text-left rounded px-2 py-1 text-sm hover:bg-accent"
-                                    onClick={() => { openStatusNote(o.id, s as OrderStatus); setEditingStatusId(null); }}
+                                    onClick={() => { requestStatusChange(o.id, s as OrderStatus); setEditingStatusId(null); }}
                                   >
                                     {(ORDER_STATUS_LABELS as any)[s] ?? s}
                                   </button>
@@ -1993,10 +2001,10 @@ function AdminOrders() {
         <DialogFooter className="shrink-0 -mx-6 mt-4 border-t border-border bg-background px-6 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
           {detail && (
             <div className="flex w-full items-end gap-3">
-              {detail.status !== "delivered" && (
+              {detail.status !== "delivered" && detail.status !== "cancelled" && (
                 <div className="min-w-0 flex-1">
                   <p className="mb-2 text-sm font-medium">Changer le statut</p>
-                  <Select value={detail.status} onValueChange={(v) => openStatusNote(detail.id, v as OrderStatus)}>
+                  <Select value={detail.status} onValueChange={(v) => requestStatusChange(detail.id, v as OrderStatus)}>
                     <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {statuses
@@ -2035,20 +2043,32 @@ function AdminOrders() {
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ajouter une note au changement de statut</DialogTitle>
+            <DialogTitle>Cause de l'annulation</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              Nouveau statut : <span className="font-semibold text-foreground">
-                {pendingStatusChange
-                  ? ORDER_STATUS_LABELS[pendingStatusChange.status]
-                  : "-"}
-              </span>
-            </p>
+            <p className="text-sm text-muted-foreground">Sélectionnez une cause ou écrivez une note personnalisée.</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto justify-start whitespace-normal text-left"
+                onClick={() => setStatusNote("Annulation demandée par le client.")}
+              >
+                Annulation demandée par le client
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto justify-start whitespace-normal text-left"
+                onClick={() => setStatusNote("Le client ne répond pas au téléphone lors de la confirmation.")}
+              >
+                Client ne répond pas au téléphone lors de la confirmation
+              </Button>
+            </div>
             <Textarea
               value={statusNote}
               onChange={(event) => setStatusNote(event.target.value)}
-              placeholder="Note visible dans le suivi de la commande (facultatif)"
+              placeholder="Indiquez la cause de l'annulation"
               rows={4}
             />
           </div>
@@ -2057,9 +2077,9 @@ function AdminOrders() {
             <Button
               variant="accent"
               onClick={submitStatusChange}
-              disabled={!pendingStatusChange}
+              disabled={!pendingStatusChange || !statusNote.trim()}
             >
-              Enregistrer le statut
+              Confirmer l'annulation
             </Button>
           </DialogFooter>
         </DialogContent>

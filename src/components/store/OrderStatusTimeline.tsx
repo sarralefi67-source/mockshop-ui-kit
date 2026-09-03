@@ -16,7 +16,7 @@ type HistoryRow = {
   status: string;
   note: string | null;
   created_at: string;
-};
+}; 
 
 const formatHistoryDate = (value: string) => {
   const date = new Date(value);
