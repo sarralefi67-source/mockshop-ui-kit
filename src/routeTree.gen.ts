@@ -28,7 +28,6 @@ import { Route as AdminCategoriesRouteImport } from './routes/admin.categories'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCommandesRouteImport } from './routes/admin.commandes'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AdminNewsletterRouteImport } from './routes/admin.newsletter'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminParametresRouteImport } from './routes/admin.parametres'
 import { Route as AdminProduitsRouteImport } from './routes/admin.produits'
@@ -136,11 +135,6 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminNewsletterRoute = AdminNewsletterRouteImport.update({
-  id: '/newsletter',
-  path: '/newsletter',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -216,7 +210,6 @@ export interface FileRoutesByFullPath {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/newsletter': typeof AdminNewsletterRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
@@ -247,7 +240,6 @@ export interface FileRoutesByTo {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/newsletter': typeof AdminNewsletterRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
@@ -281,7 +273,6 @@ export interface FileRoutesById {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/commandes': typeof AdminCommandesRoute
   '/admin/login': typeof AdminLoginRoute
-  '/admin/newsletter': typeof AdminNewsletterRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/parametres': typeof AdminParametresRoute
   '/admin/produits': typeof AdminProduitsRoute
@@ -316,7 +307,6 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
-    | '/admin/newsletter'
     | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
@@ -347,7 +337,6 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
-    | '/admin/newsletter'
     | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
@@ -380,7 +369,6 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/commandes'
     | '/admin/login'
-    | '/admin/newsletter'
     | '/admin/notifications'
     | '/admin/parametres'
     | '/admin/produits'
@@ -549,13 +537,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/newsletter': {
-      id: '/admin/newsletter'
-      path: '/newsletter'
-      fullPath: '/admin/newsletter'
-      preLoaderRoute: typeof AdminNewsletterRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/notifications': {
       id: '/admin/notifications'
       path: '/notifications'
@@ -643,7 +624,6 @@ interface AdminRouteChildren {
   AdminClientsRoute: typeof AdminClientsRoute
   AdminCommandesRoute: typeof AdminCommandesRoute
   AdminLoginRoute: typeof AdminLoginRoute
-  AdminNewsletterRoute: typeof AdminNewsletterRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminParametresRoute: typeof AdminParametresRoute
   AdminProduitsRoute: typeof AdminProduitsRoute
@@ -658,7 +638,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClientsRoute: AdminClientsRoute,
   AdminCommandesRoute: AdminCommandesRoute,
   AdminLoginRoute: AdminLoginRoute,
-  AdminNewsletterRoute: AdminNewsletterRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminParametresRoute: AdminParametresRoute,
   AdminProduitsRoute: AdminProduitsRoute,

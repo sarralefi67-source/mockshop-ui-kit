@@ -1,10 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { Facebook, Instagram, Mail, MapPin, Phone, Truck, ShieldCheck, RotateCcw } from "lucide-react";
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { supabase } from "@/lib/supabaseClient";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 import { isSafeUrl } from "@/lib/utils";
 
@@ -25,7 +20,6 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 export function Footer() {
-  const [email, setEmail] = useState("");
   const { settings } = useSiteSettings();
 
   return (
@@ -132,50 +126,6 @@ export function Footer() {
           </div>
         </div>
 
-        {/* <div>
-          <h3 className="relative pb-3 font-display text-base font-semibold text-deep-foreground after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-10 after:bg-ocre">Newsletter</h3>
-          <p className="mt-4 text-sm text-deep-foreground/70">
-            Recevez les promos et nouveautés une fois par semaine.
-          </p>
-          <form
-            className="mt-4 flex gap-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!email) return;
-              try {
-                const { error } = await supabase.from("newsletter_subscribers").insert({ email }).select();
-                if (error) {
-                  // handle duplicate gracefully
-                  if ((error as any).code === "23505") {
-                    toast.success("Vous êtes déjà inscrit(e) à la newsletter.");
-                  } else {
-                    console.error("newsletter insert error:", error);
-                    toast.error("Impossible de vous inscrire pour le moment.");
-                  }
-                } else {
-                  toast.success("Inscription à la newsletter enregistrée.");
-                  setEmail("");
-                }
-              } catch (err) {
-                console.error(err);
-                toast.error("Erreur réseau.");
-              }
-            }}
-          >
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              required
-              placeholder="Votre e-mail"
-              aria-label="E-mail"
-              className="h-11 rounded-md border-deep-foreground/20 bg-deep-foreground/10 text-deep-foreground placeholder:text-deep-foreground/50"
-            />
-            <Button variant="accent" type="submit" className="h-11 px-6 font-bold uppercase tracking-[0.08em]">
-              OK
-            </Button>
-          </form>
-        </div> */}
       </div>
 
       <div className="border-t border-deep-foreground/15 py-5">

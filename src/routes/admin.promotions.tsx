@@ -544,7 +544,11 @@ function AdminPromotions() {
         .select("coupon_id")
         .in("coupon_id", confirmDeleteCouponIds);
       if (usageError) throw usageError;
-      const usedIds = new Set((usedOrders ?? []).map((order) => order.coupon_id).filter(Boolean));
+      const usedIds = new Set(
+        (usedOrders ?? [])
+          .map((order) => order.coupon_id)
+          .filter((id): id is string => id !== null),
+      );
       const unusedIds = confirmDeleteCouponIds.filter((id) => !usedIds.has(id));
       if (unusedIds.length > 0) {
         const { error } = await supabase.from("coupons").delete().in("id", unusedIds);

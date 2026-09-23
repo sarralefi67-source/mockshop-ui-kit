@@ -24,7 +24,7 @@ function PasswordField({
   value: string;
   onChange: (value: string) => void;
   autoComplete: string;
-  error?: string;
+  error?: string | undefined;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -70,7 +70,6 @@ function AccountInfo() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [newsletter, setNewsletter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [passwordStep, setPasswordStep] = useState<1 | 2>(1);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -90,7 +89,6 @@ function AccountInfo() {
     setLastName(profile.last_name ?? "");
     setEmail(profile.email ?? "");
     setPhone(profile.phone ?? "");
-    setNewsletter(Boolean(profile.newsletter_opt_in));
   }, [profile]);
 
   return (
@@ -114,14 +112,9 @@ function AccountInfo() {
                 last_name: lastName.trim() || null,
                 email: email.trim() || null,
                 phone: phone.trim() || null,
-                newsletter_opt_in: newsletter,
               })
               .eq("id", profile.id);
             if (error) throw error;
-            if (newsletter && email.trim()) {
-              // best-effort: ensure newsletter_subscribers also has this email
-              await supabase.from("newsletter_subscribers").insert({ email: email.trim() });
-            }
             toast.success("Informations enregistrées.");
           } catch (err) {
             console.error("save profile error:", err);
@@ -185,7 +178,7 @@ function AccountInfo() {
               value={currentPassword}
               onChange={(value) => {
                 setCurrentPassword(value);
-                if (passwordErrors.current) setPasswordErrors((errors) => ({ ...errors, current: undefined }));
+                if (passwordErrors.current) setPasswordErrors(({ current: _current, ...errors }) => errors);
               }}
               autoComplete="current-password"
               error={passwordErrors.current}
@@ -238,7 +231,7 @@ function AccountInfo() {
               value={newPassword}
               onChange={(value) => {
                 setNewPassword(value);
-                if (passwordErrors.new) setPasswordErrors((errors) => ({ ...errors, new: undefined }));
+                if (passwordErrors.new) setPasswordErrors(({ new: _new, ...errors }) => errors);
               }}
               autoComplete="new-password"
               error={passwordErrors.new}
@@ -249,7 +242,7 @@ function AccountInfo() {
               value={confirmPassword}
               onChange={(value) => {
                 setConfirmPassword(value);
-                if (passwordErrors.confirm) setPasswordErrors((errors) => ({ ...errors, confirm: undefined }));
+                if (passwordErrors.confirm) setPasswordErrors(({ confirm: _confirm, ...errors }) => errors);
               }}
               autoComplete="new-password"
               error={passwordErrors.confirm}

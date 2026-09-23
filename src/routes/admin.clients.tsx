@@ -68,7 +68,7 @@ function AdminClients() {
 
       if (error) throw error;
 
-      const rows = (data ?? []).map((customer: any) => ({
+      const rows = (Array.isArray(data) ? data : []).map((customer: any) => ({
         id: customer.id,
         first_name: customer.first_name ?? null,
         last_name: customer.last_name ?? null,

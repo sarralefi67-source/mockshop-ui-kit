@@ -29,7 +29,6 @@ export function AuthDialog() {
   const { authDialog, setAuthMode, closeAuth, signIn, signUp, signOut } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [newsletter, setNewsletter] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [signupPasswordVisible, setSignupPasswordVisible] = useState(false);
   const [signinPasswordVisible, setSigninPasswordVisible] = useState(false);
@@ -139,16 +138,6 @@ export function AuthDialog() {
       toast.error(message);
       return;
     }
-    if (newsletter) {
-      // Table indépendante : on n'attend pas que la ligne profil soit créée.
-      supabase
-        .from("newsletter_subscribers")
-        .insert({ email })
-        .then(({ error: newsletterError }) => {
-          if (newsletterError)
-            console.warn("newsletter subscribe on signup failed:", newsletterError);
-        });
-    }
     finish("Compte créé : vérifiez votre e-mail pour confirmer votre adresse.");
   };
 
@@ -254,16 +243,6 @@ export function AuthDialog() {
                 </p>
               ) : null}
             </div>
-            {/* <div className="flex items-start gap-2">
-              <Checkbox
-                id="auth-newsletter"
-                checked={newsletter}
-                onCheckedChange={(value) => setNewsletter(value === true)}
-              />
-              <Label htmlFor="auth-newsletter" className="text-sm font-normal leading-snug">
-                Je souhaite recevoir la newsletter (promos et nouveautés).
-              </Label>
-            </div> */}
             <div className="flex items-start gap-2">
               <Checkbox
                 id="auth-terms"

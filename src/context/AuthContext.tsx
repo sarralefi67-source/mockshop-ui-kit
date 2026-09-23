@@ -8,7 +8,6 @@ type Profile = {
   last_name?: string | null;
   email?: string | null;
   phone?: string | null;
-  newsletter_opt_in?: boolean | null;
 };
 
 export type AuthMode = "signin" | "signup";

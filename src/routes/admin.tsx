@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   BadgePercent, ChevronLeft, Image, LayoutDashboard, ListTree, Menu, Package, ShoppingBag, Store,
-  Bell, User, LogOut, MessageCircle, Mail,
+  Bell, User, LogOut, MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,6 @@ const nav = [
   { to: "/admin/promotions", label: "Promotions & coupons", icon: BadgePercent, exact: false },
   { to: "/admin/categories", label: "Catégories", icon: ListTree, exact: false },
   { to: "/admin/clients", label: "Clients", icon: User, exact: false },
-  // { to: "/admin/newsletter", label: "Newsletter", icon: Mail, exact: false },
   { to: "/admin/avis", label: "Avis clients", icon: MessageCircle, exact: false },
   { to: "/admin/parametres", label: "Paramètres", icon: User, exact: false },
 ] as const;

@@ -80,39 +80,6 @@ export type Database = {
         }
         Relationships: []
       }
-      admin_audit_log: {
-        Row: {
-          action: string
-          admin_id: string | null
-          created_at: string | null
-          id: string
-          new_value: Json | null
-          old_value: Json | null
-          record_id: string | null
-          table_name: string
-        }
-        Insert: {
-          action: string
-          admin_id?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: Json | null
-          old_value?: Json | null
-          record_id?: string | null
-          table_name: string
-        }
-        Update: {
-          action?: string
-          admin_id?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: Json | null
-          old_value?: Json | null
-          record_id?: string | null
-          table_name?: string
-        }
-        Relationships: []
-      }
       attribute_values: {
         Row: {
           attribute_id: string | null
@@ -418,27 +385,6 @@ export type Database = {
         }
         Relationships: []
       }
-      newsletter_subscribers: {
-        Row: {
-          email: string
-          id: string
-          is_active: boolean | null
-          subscribed_at: string | null
-        }
-        Insert: {
-          email: string
-          id?: string
-          is_active?: boolean | null
-          subscribed_at?: string | null
-        }
-        Update: {
-          email?: string
-          id?: string
-          is_active?: boolean | null
-          subscribed_at?: string | null
-        }
-        Relationships: []
-      }
       notifications: {
         Row: {
           id: string
@@ -663,6 +609,7 @@ export type Database = {
       product_variants: {
         Row: {
           compare_at_price: number | null
+          cost_price: number | null
           created_at: string | null
           id: string
           is_active: boolean | null
@@ -674,6 +621,7 @@ export type Database = {
         }
         Insert: {
           compare_at_price?: number | null
+          cost_price?: number | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -685,6 +633,7 @@ export type Database = {
         }
         Update: {
           compare_at_price?: number | null
+          cost_price?: number | null
           created_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -788,7 +737,6 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
-          newsletter_opt_in: boolean | null
           phone: string | null
           role: string
         }
@@ -798,7 +746,6 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
-          newsletter_opt_in?: boolean | null
           phone?: string | null
           role?: string
         }
@@ -808,7 +755,6 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
-          newsletter_opt_in?: boolean | null
           phone?: string | null
           role?: string
         }
@@ -1029,7 +975,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      review_profiles: {
+        Row: {
+          first_name: string | null
+          id: string
+          last_name: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Functions: {
       get_admin_dashboard_kpis: {
@@ -1051,6 +1006,19 @@ export type Database = {
             month: string
             total: number
           }>
+      }
+      get_admin_best_sellers: {
+        Args: { p_days?: number; p_end_date?: string; p_limit?: number }
+        Returns: Array<{
+          month: string
+          product_id: string | null
+          variant_id: string | null
+          product_name: string
+          sku: string | null
+          image_url: string | null
+          quantity: number
+          revenue: number
+        }>
       }
         get_admin_low_stock_products: {
           Args: { p_limit?: number }
@@ -1130,6 +1098,7 @@ export type ProductVariant = {
   promo_percent?: number | null
   price_after_promo?: number | null
   stock: number
+  is_active?: boolean
   position?: number
 }
 

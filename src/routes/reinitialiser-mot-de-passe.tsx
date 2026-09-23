@@ -30,13 +30,13 @@ function ResetPasswordPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const errors: Record<string, string> = {};
-    if (!password) errors.password = "Le nouveau mot de passe est obligatoire.";
-    else if (password.length < 6) errors.password = "Le mot de passe doit contenir au moins 6 caractères.";
-    if (!confirmation) errors.confirmation = "La confirmation du mot de passe est obligatoire.";
-    else if (password !== confirmation) errors.confirmation = "Les mots de passe ne correspondent pas.";
+    if (!password) errors["password"] = "Le nouveau mot de passe est obligatoire.";
+    else if (password.length < 6) errors["password"] = "Le mot de passe doit contenir au moins 6 caractères.";
+    if (!confirmation) errors["confirmation"] = "La confirmation du mot de passe est obligatoire.";
+    else if (password !== confirmation) errors["confirmation"] = "Les mots de passe ne correspondent pas.";
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      const firstInvalidField = errors.password ? "new-password" : "confirm-password";
+      const firstInvalidField = errors["password"] ? "new-password" : "confirm-password";
       document.getElementById(firstInvalidField)?.focus();
       return;
     }
@@ -69,11 +69,11 @@ function ResetPasswordPage() {
                   id="new-password"
                   type={passwordVisible ? "text" : "password"}
                   aria-required="true"
-                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-invalid={Boolean(fieldErrors["password"])}
                   autoComplete="new-password"
                   value={password}
                   onChange={(event) => { setPassword(event.target.value); setFieldErrors((errors) => ({ ...errors, password: "" })); }}
-                  className={`pr-11 ${fieldErrors.password ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  className={`pr-11 ${fieldErrors["password"] ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 />
                 <Button
                   type="button"
@@ -86,7 +86,7 @@ function ResetPasswordPage() {
                   {passwordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {fieldErrors.password && <p className="text-sm text-red-600">{fieldErrors.password}</p>}
+              {fieldErrors["password"] && <p className="text-sm text-red-600">{fieldErrors["password"]}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmer le mot de passe</Label>
@@ -95,11 +95,11 @@ function ResetPasswordPage() {
                   id="confirm-password"
                   type={confirmationVisible ? "text" : "password"}
                   aria-required="true"
-                  aria-invalid={Boolean(fieldErrors.confirmation)}
+                  aria-invalid={Boolean(fieldErrors["confirmation"])}
                   autoComplete="new-password"
                   value={confirmation}
                   onChange={(event) => { setConfirmation(event.target.value); setFieldErrors((errors) => ({ ...errors, confirmation: "" })); }}
-                  className={`pr-11 ${fieldErrors.confirmation ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  className={`pr-11 ${fieldErrors["confirmation"] ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 />
                 <Button
                   type="button"
@@ -112,7 +112,7 @@ function ResetPasswordPage() {
                   {confirmationVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {fieldErrors.confirmation && <p className="text-sm text-red-600">{fieldErrors.confirmation}</p>}
+              {fieldErrors["confirmation"] && <p className="text-sm text-red-600">{fieldErrors["confirmation"]}</p>}
             </div>
             <Button variant="accent" size="lg" type="submit" className="w-full" disabled={loading}>
               {loading ? "Enregistrement…" : "Réinitialiser le mot de passe"}

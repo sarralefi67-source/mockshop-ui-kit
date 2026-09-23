@@ -256,7 +256,7 @@ function AdminProducts() {
           sku: v.sku ?? "",
           options: (v.variant_attribute_values ?? []).reduce((acc: Record<string, string>, link: any) => {
             const val = link.attribute_value_id as string;
-            const attr = attributes.find((a) => a.values.some((x) => x.id === val));
+            const attr = attributes.find((a: ProductAttribute) => a.values.some((x) => x.id === val));
             if (attr) acc[attr.id] = val;
             return acc;
           }, {}),
